@@ -1,0 +1,9 @@
+.env
+.env.*
+node_modules/
+webapp/data/state.json
+webapp/data/state.json.tmp
+reunions/
+juridique/
+scripts/
+MIGRATION_GITHUB_SUPABASE.md

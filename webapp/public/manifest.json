@@ -1,0 +1,19 @@
+{
+  "name": "Collectif Tombola — Bateau sur la Loire",
+  "short_name": "Tombola",
+  "description": "Application du collectif Tombola : statut en direct, planning, écopage, essence, charte et carnet de bord.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#115e67",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
