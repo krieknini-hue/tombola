@@ -7,6 +7,7 @@ create table if not exists public.members (
   short text not null,
   color text not null,
   role text default '',
+  avatar_url text not null default '',
   created_at timestamptz default now()
 );
 
@@ -41,6 +42,7 @@ create table if not exists public.boat_status (
   location jsonb not null default '{}'::jsonb,
   ecopage jsonb not null default '{}'::jsonb,
   fuel_config jsonb not null default '{"mode":"scale","emptyTankKg":1.8,"fullTankKg":10.8,"densityKgPerL":0.75,"pricePerLiter":1.85,"currentWeightKg":9.3}'::jsonb,
+  priority_config jsonb not null default '{"weekdayPerHour":1,"weekendPerHour":2.5,"openDiscount":0.5,"lastMinuteFree":true,"includeChantier":false}'::jsonb,
   updated_by text references public.members(id),
   updated_at timestamptz default now()
 );
@@ -141,7 +143,7 @@ create table if not exists public.collab_docs (
 create index if not exists collab_docs_author_id_idx on public.collab_docs (author_id);
 create index if not exists collab_docs_updated_by_idx on public.collab_docs (updated_by);
 
--- 9. Discussion en direct
+-- 9. Fil d'activité en direct & annonces
 create table if not exists public.messages (
   id text primary key,
   author_id text references public.members(id),
@@ -155,8 +157,37 @@ create table if not exists public.messages (
 create index if not exists messages_author_id_idx on public.messages (author_id);
 create index if not exists messages_created_at_idx on public.messages (created_at desc);
 
+-- 10. To-Do & Liste de courses
+create table if not exists public.todos (
+  id text primary key,
+  title text not null,
+  kind text not null default 'course' check (kind in ('course', 'tache')),
+  done boolean not null default false,
+  author_id text references public.members(id),
+  done_by text references public.members(id),
+  done_at timestamptz,
+  note text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists todos_author_id_idx on public.todos (author_id);
+create index if not exists todos_done_by_idx on public.todos (done_by);
+
+-- 11. Album photo du collectif
+create table if not exists public.photos (
+  id text primary key,
+  title text not null,
+  category text not null default 'navigation' check (category in ('navigation', 'chantier', 'collectif')),
+  author_id text references public.members(id),
+  image_url text not null,
+  taken_on date not null default current_date,
+  created_at timestamptz not null default now()
+);
+create index if not exists photos_author_id_idx on public.photos (author_id);
+create index if not exists photos_created_at_idx on public.photos (created_at desc);
+
 -- Publication Realtime
 alter publication supabase_realtime add table
+  public.members,
   public.boat_status,
   public.bookings,
   public.fuel_logs,
@@ -164,7 +195,9 @@ alter publication supabase_realtime add table
   public.ideas,
   public.logbook_entries,
   public.collab_docs,
-  public.messages;
+  public.messages,
+  public.todos,
+  public.photos;
 
 -- Privilèges SQL (moindre privilège)
 revoke all on
@@ -176,18 +209,23 @@ revoke all on
   public.ideas,
   public.logbook_entries,
   public.collab_docs,
-  public.messages
+  public.messages,
+  public.todos,
+  public.photos
 from anon, authenticated;
 
 grant select on public.members to authenticated;
+grant update (avatar_url) on public.members to authenticated;
 grant select, update on public.boat_status to authenticated;
 grant select, insert, update, delete on public.bookings to authenticated;
-grant select, insert on public.fuel_logs to authenticated;
+grant select, insert, delete on public.fuel_logs to authenticated;
 grant select, insert, update on public.charter_sections to authenticated;
-grant select, insert, update on public.ideas to authenticated;
-grant select, insert on public.logbook_entries to authenticated;
-grant select, insert, update on public.collab_docs to authenticated;
-grant select, insert, update on public.messages to authenticated;
+grant select, insert, update, delete on public.ideas to authenticated;
+grant select, insert, delete on public.logbook_entries to authenticated;
+grant select, insert, update, delete on public.collab_docs to authenticated;
+grant select, insert, update, delete on public.messages to authenticated;
+grant select, insert, update, delete on public.todos to authenticated;
+grant select, insert, delete on public.photos to authenticated;
 
 -- Activation RLS
 alter table public.members enable row level security;
@@ -199,11 +237,18 @@ alter table public.ideas enable row level security;
 alter table public.logbook_entries enable row level security;
 alter table public.collab_docs enable row level security;
 alter table public.messages enable row level security;
+alter table public.todos enable row level security;
+alter table public.photos enable row level security;
 
 -- Politiques RLS strictes TO authenticated
 create policy members_select on public.members
   for select to authenticated
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy members_update on public.members
+  for update to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'))
+  with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
 create policy boat_status_select on public.boat_status
   for select to authenticated
@@ -239,6 +284,10 @@ create policy fuel_logs_insert on public.fuel_logs
   for insert to authenticated
   with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
+create policy fuel_logs_delete on public.fuel_logs
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
 create policy charter_sections_select on public.charter_sections
   for select to authenticated
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
@@ -265,6 +314,10 @@ create policy ideas_update on public.ideas
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'))
   with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
+create policy ideas_delete on public.ideas
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
 create policy logbook_entries_select on public.logbook_entries
   for select to authenticated
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
@@ -272,6 +325,10 @@ create policy logbook_entries_select on public.logbook_entries
 create policy logbook_entries_insert on public.logbook_entries
   for insert to authenticated
   with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy logbook_entries_delete on public.logbook_entries
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
 create policy collab_docs_select on public.collab_docs
   for select to authenticated
@@ -286,6 +343,10 @@ create policy collab_docs_update on public.collab_docs
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'))
   with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
+create policy collab_docs_delete on public.collab_docs
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
 create policy messages_select on public.messages
   for select to authenticated
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
@@ -298,6 +359,39 @@ create policy messages_update on public.messages
   for update to authenticated
   using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'))
   with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy messages_delete on public.messages
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy todos_select on public.todos
+  for select to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy todos_insert on public.todos
+  for insert to authenticated
+  with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy todos_update on public.todos
+  for update to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'))
+  with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy todos_delete on public.todos
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy photos_select on public.photos
+  for select to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy photos_insert on public.photos
+  for insert to authenticated
+  with check ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
+
+create policy photos_delete on public.photos
+  for delete to authenticated
+  using ((((select auth.jwt()) -> 'app_metadata' ->> 'collective') = 'tombola'));
 
 -- Schéma privé & vérification du code collectif (hash configuré en base hors Git)
 create schema if not exists private;

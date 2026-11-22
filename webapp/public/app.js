@@ -28,11 +28,12 @@ const LOIRE_SPOTS = [
 const BOAT_GUIDES = [
   {
     id: 'guide-moteur',
+    section: 'tech',
     icon: '⚙️',
     title: 'Démarrer le moteur & points de vigilance',
-    summary: 'Vérifier la durite de refroidissement, l\'essence et la sécurité trappe.',
+    summary: 'Vérifier la durite de refroidissement, l\'essence au peson et la sécurité trappe.',
     steps: [
-      'Ouvrir le cadenas à code de la trappe sous le moteur et vérifier le niveau d\'essence (ou peser la nourrice avant de partir).',
+      'Ouvrir le cadenas à code de la trappe sous le moteur et vérifier le niveau d\'essence (accrocher simplement la nourrice au peson à crochet dans le vide avant de partir).',
       'Brancher le tuyau d\'essence avec la poire flèche vers le moteur, pomper jusqu\'à ce qu\'elle soit ferme, et ouvrir la vis d\'évent du bouchon.',
       'Vérifier la petite durite renifleur de refroidissement (maintenue par le collier Colson) : de l\'eau doit pisser dès que le moteur tourne.',
       'Penser à relever l\'embase si on approche d\'un banc de sable peu profond.'
@@ -40,6 +41,7 @@ const BOAT_GUIDES = [
   },
   {
     id: 'guide-voile',
+    section: 'tech',
     icon: '⛵',
     title: 'Navigation sous voile & affalage d\'urgence',
     summary: 'Consignes essentielles de Clément et Titouan (testé par 55 km/h de vent).',
@@ -52,6 +54,7 @@ const BOAT_GUIDES = [
   },
   {
     id: 'guide-securite',
+    section: 'safety',
     icon: '🦺',
     title: 'Matériel de sécurité obligatoire à bord',
     summary: 'Check-list rapide avant de larguer les amarres au Pélio.',
@@ -64,13 +67,14 @@ const BOAT_GUIDES = [
   },
   {
     id: 'guide-retour',
+    section: 'safety',
     icon: '⚓',
     title: 'Check-list retour au Port du Pélio',
     summary: 'Les 5 gestes simples pour laisser Tombola nickel au suivant.',
     steps: [
       'Amarrer proprement à l\'emplacement prévu (double amarre si crue ou vent annoncé).',
       'Écoper si besoin et nettoyer les traces de boue/sable sur les caillebotis.',
-      'Couper l\'évent de la nourrice, peser la nourrice sur la balance et noter le poids dans l\'appli (onglet Essence).',
+      'Couper l\'évent de la nourrice, soulever la nourrice dans le vide avec le peson à crochet et noter le poids dans l\'onglet Essence.',
       'Refermer la trappe moteur avec le cadenas à code.',
       'Cliquer sur « Je suis rentré au Pélio » sur l\'appli pour que le voyant repasse au vert.'
     ]
@@ -120,6 +124,8 @@ let planningAnchorDate = new Date();
 let selectedMonthDate = '';
 let activeBookingFilter = 'all';
 let activeDocsTab = 'logbook';
+let activeTodoFilter = 'open'; // 'open' | 'all' | 'course' | 'tache'
+let activePhotoFilter = 'all'; // 'all' | 'navigation' | 'chantier' | 'collectif'
 let activeChatFilter = 'all'; // 'all' | 'pinned' | 'sortie' | 'materiel'
 let helpEnabled = localStorage.getItem(STORAGE_HELP_KEY) !== 'false';
 let autoGpsEnabled = localStorage.getItem(STORAGE_AUTO_GPS_KEY) === 'true';
@@ -133,6 +139,7 @@ let selectedFuelCrewSet = new Set();
 let fuelCrewInitialized = false;
 let pendingPhotoData = '';
 let pendingLogPhotoData = '';
+let pendingAlbumPhotoData = '';
 
 // Helpers DOM
 const $ = (sel) => document.querySelector(sel);
@@ -309,7 +316,9 @@ async function loadAllState() {
     ideasRes,
     logbookRes,
     collabDocsRes,
-    messagesRes
+    messagesRes,
+    todosRes,
+    photosRes
   ] = await Promise.all([
     sbClient.from('members').select('*'),
     sbClient.from('boat_status').select('*').eq('id', 1).single(),
@@ -319,12 +328,15 @@ async function loadAllState() {
     sbClient.from('ideas').select('*').order('created_at', { ascending: false }),
     sbClient.from('logbook_entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     sbClient.from('collab_docs').select('*').order('created_at', { ascending: false }),
-    sbClient.from('messages').select('*').order('created_at', { ascending: false }).limit(80)
+    sbClient.from('messages').select('*').order('created_at', { ascending: false }).limit(80),
+    sbClient.from('todos').select('*').order('done', { ascending: true }).order('created_at', { ascending: false }),
+    sbClient.from('photos').select('*').order('taken_on', { ascending: false }).order('created_at', { ascending: false })
   ]);
 
   const results = [
     membersRes, boatRes, bookingsRes, fuelLogsRes,
-    charterRes, ideasRes, logbookRes, collabDocsRes, messagesRes
+    charterRes, ideasRes, logbookRes, collabDocsRes,
+    messagesRes, todosRes, photosRes
   ];
   const firstErr = results.find((r) => r.error)?.error;
   if (firstErr) {
@@ -336,14 +348,21 @@ async function loadAllState() {
     throw new Error(firstErr.message || 'Erreur lors du chargement Supabase.');
   }
 
-  const members = (membersRes.data || []).slice().sort((a, b) => {
-    const ia = MEMBER_ORDER.indexOf(a.id);
-    const ib = MEMBER_ORDER.indexOf(b.id);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const members = (membersRes.data || [])
+    .slice()
+    .sort((a, b) => {
+      const ia = MEMBER_ORDER.indexOf(a.id);
+      const ib = MEMBER_ORDER.indexOf(b.id);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    })
+    .map((m) => ({
+      ...m,
+      avatarUrl: m.avatar_url || ''
+    }));
 
   const logRows = logbookRes.data || [];
   const msgRows = messagesRes.data || [];
+  const photoRows = photosRes.data || [];
   const pathsToSign = ['docs/Compte_Rendu_Tombolla_Rochecorbon.pdf'];
   for (const r of logRows) {
     if (typeof r.image_url === 'string' && r.image_url.startsWith('storage:')) {
@@ -351,6 +370,11 @@ async function loadAllState() {
     }
   }
   for (const r of msgRows) {
+    if (typeof r.image_url === 'string' && r.image_url.startsWith('storage:')) {
+      pathsToSign.push(r.image_url.slice('storage:'.length));
+    }
+  }
+  for (const r of photoRows) {
     if (typeof r.image_url === 'string' && r.image_url.startsWith('storage:')) {
       pathsToSign.push(r.image_url.slice('storage:'.length));
     }
@@ -366,6 +390,7 @@ async function loadAllState() {
   const bs = boatRes.data || {};
   const fc = bs.fuel_config || {};
   const eco = bs.ecopage || {};
+  const pc = bs.priority_config || {};
 
   appState = {
     boatName: 'Tombola',
@@ -373,7 +398,7 @@ async function loadAllState() {
     loireSpots: LOIRE_SPOTS,
     guides: BOAT_GUIDES,
     boatStatus: {
-      state: bs.state || 'mooring',
+      state: bs.state || 'chantier',
       crew: Array.isArray(bs.crew) ? bs.crew : [],
       lastWaterCrew: Array.isArray(bs.last_water_crew) ? bs.last_water_crew : [],
       outingType: bs.outing_type || 'open',
@@ -387,10 +412,17 @@ async function loadAllState() {
     ecopage: {
       rotationOrder: Array.isArray(eco.rotationOrder) ? eco.rotationOrder : MEMBER_ORDER,
       currentIndex: Number(eco.currentIndex) || 0,
-      weekLabel: eco.weekLabel || 'Semaine en cours',
-      lastCheckedBy: eco.lastCheckedBy || 'anthony',
+      weekLabel: eco.weekLabel || 'Au démarrage après chantier',
+      lastCheckedBy: eco.lastCheckedBy || '',
       lastCheckedAt: eco.lastCheckedAt || '',
       stateNote: eco.stateNote || ''
+    },
+    priorityConfig: {
+      weekdayPerHour: Number(pc.weekdayPerHour ?? 1),
+      weekendPerHour: Number(pc.weekendPerHour ?? 2.5),
+      openDiscount: Number(pc.openDiscount ?? 0.5),
+      lastMinuteFree: pc.lastMinuteFree !== false,
+      includeChantier: Boolean(pc.includeChantier)
     },
     fuel: {
       mode: fc.mode === 'mark' ? 'mark' : 'scale',
@@ -428,6 +460,26 @@ async function loadAllState() {
       isLastMinute: Boolean(b.is_last_minute),
       note: b.note || '',
       createdAt: b.created_at
+    })),
+    todos: (todosRes.data || []).map((t) => ({
+      id: t.id,
+      title: t.title,
+      kind: t.kind || 'course',
+      done: Boolean(t.done),
+      authorId: t.author_id,
+      doneBy: t.done_by || '',
+      doneAt: t.done_at || '',
+      note: t.note || '',
+      createdAt: t.created_at
+    })),
+    photos: photoRows.map((p) => ({
+      id: p.id,
+      title: p.title,
+      category: p.category || 'navigation',
+      authorId: p.author_id,
+      takenOn: p.taken_on || '',
+      imageData: resolveImageField(p.image_url),
+      createdAt: p.created_at
     })),
     charterSections: (charterRes.data || []).map((c) => ({
       id: c.id,
@@ -520,6 +572,39 @@ function throwIfSupabaseError(error, fallbackMsg) {
   throw new Error(error.message || fallbackMsg || 'Une erreur est survenue.');
 }
 
+async function logActivity(memberId, category, text) {
+  if (!text || !hasActiveAuthSession()) return;
+  try {
+    const allowedCategories = ['info', 'sortie', 'materiel', 'photo'];
+    await sbClient.from('messages').insert({
+      id: makeId('act'),
+      author_id: cleanStr(memberId, 40) || currentMemberId || 'anthony',
+      category: allowedCategories.includes(category) ? category : 'info',
+      pinned: false,
+      reactions: { '👍': [], '⛵': [], '🛠️': [] },
+      text: cleanStr(text, 900),
+      image_url: '',
+      created_at: new Date().toISOString()
+    });
+  } catch {
+    // ne jamais bloquer l'action principale si le journal d'activité échoue
+  }
+}
+
+function openWhatsAppShare(text) {
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener');
+}
+
+function renderAvatarDotHtml(member, sizePx = 20, fontSize = '0.68rem', cls = 'avatar-dot') {
+  const m = member || getMember('');
+  const sizeStyle = sizePx ? `width:${sizePx}px;height:${sizePx}px;font-size:${fontSize};` : '';
+  if (m.avatarUrl) {
+    return `<span class="${cls}" style="${sizeStyle}background:transparent;"><img src="${escapeHtml(m.avatarUrl)}" alt="${escapeHtml(m.name)}" class="avatar-img"></span>`;
+  }
+  return `<span class="${cls}" style="${sizeStyle}background:${escapeHtml(m.color)}">${escapeHtml(m.short)}</span>`;
+}
+
 async function apiPost(route, body = {}) {
   if (!hasActiveAuthSession()) {
     openProfileDialog();
@@ -598,6 +683,16 @@ async function apiPost(route, body = {}) {
       })
       .eq('id', 1);
     throwIfSupabaseError(error, 'Impossible de mettre à jour le statut du bateau.');
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || bs.updated_by;
+    if (body.state && body.state !== prevState) {
+      const actor = getMember(actorId).name;
+      const msgTxt = nextState === 'water'
+        ? `⛵ ${actor} a passé Tombola « Sur l'eau » (${nextLocation.name || 'Loire'}).`
+        : nextState === 'chantier'
+          ? `🟠 ${actor} a passé Tombola en statut « En chantier ».`
+          : `⚓ ${actor} a signalé le retour de Tombola au Port du Pélio (libre).`;
+      await logActivity(actorId, nextState === 'chantier' ? 'materiel' : 'sortie', msgTxt);
+    }
     await loadAllState();
     return appState;
   }
@@ -610,12 +705,14 @@ async function apiPost(route, body = {}) {
       : MEMBER_ORDER;
     eco.rotationOrder = order;
     let curIdx = Number(eco.currentIndex) || 0;
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || order[curIdx];
 
     if (body.action === 'next_person') {
       curIdx = (curIdx + 1) % order.length;
       eco.currentIndex = curIdx;
+      await logActivity(actorId, 'materiel', `🔄 ${getMember(actorId).name} a passé le tour d'écopage à ${getMember(order[curIdx]).name}.`);
     } else {
-      eco.lastCheckedBy = cleanStr(body.memberId, 40) || order[curIdx];
+      eco.lastCheckedBy = actorId;
       eco.lastCheckedAt = nowIso;
       if (body.stateNote) {
         eco.stateNote = cleanStr(body.stateNote, 240);
@@ -624,17 +721,42 @@ async function apiPost(route, body = {}) {
         curIdx = (curIdx + 1) % order.length;
         eco.currentIndex = curIdx;
       }
+      await logActivity(actorId, 'materiel', `🪣 ${getMember(actorId).name} a validé l'écopage de la semaine.`);
     }
 
     const { error } = await sbClient
       .from('boat_status')
       .update({
         ecopage: eco,
-        updated_by: cleanStr(body.memberId, 40) || bs.updated_by,
+        updated_by: actorId,
         updated_at: nowIso
       })
       .eq('id', 1);
     throwIfSupabaseError(error, 'Impossible de mettre à jour l\'écopage.');
+    await loadAllState();
+    return appState;
+  }
+
+  if (route === '/api/priority-config') {
+    const bs = await fetchSingleRow('boat_status', 1);
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || 'anthony';
+    const nextCfg = {
+      weekdayPerHour: Math.max(0, Math.min(10, Number(body.weekdayPerHour ?? 1))),
+      weekendPerHour: Math.max(0, Math.min(10, Number(body.weekendPerHour ?? 2.5))),
+      openDiscount: Math.max(0, Math.min(0.9, Number(body.openDiscount ?? 0.5))),
+      lastMinuteFree: Boolean(body.lastMinuteFree),
+      includeChantier: Boolean(body.includeChantier)
+    };
+    const { error } = await sbClient
+      .from('boat_status')
+      .update({
+        priority_config: nextCfg,
+        updated_by: actorId,
+        updated_at: nowIso
+      })
+      .eq('id', 1);
+    throwIfSupabaseError(error, 'Impossible d\'enregistrer les règles de priorité.');
+    await logActivity(actorId, 'info', `⚖️ ${getMember(actorId).name} a ajusté les règles de priorité du planning (semaine ${nextCfg.weekdayPerHour} u/h, WE ${nextCfg.weekendPerHour} u/h).`);
     await loadAllState();
     return appState;
   }
@@ -668,6 +790,7 @@ async function apiPost(route, body = {}) {
       created_at: nowIso
     });
     throwIfSupabaseError(error, 'Impossible d\'ajouter ce créneau.');
+    await logActivity(authorId, type === 'chantier' ? 'materiel' : 'sortie', `📅 ${getMember(authorId).name} a ajouté au planning : « ${title} » (${formatDateFr(date)}).`);
     await loadAllState();
     return appState;
   }
@@ -680,6 +803,7 @@ async function apiPost(route, body = {}) {
     const booking = await fetchSingleRow('bookings', body.bookingId);
     const participants = Array.isArray(booking.participants) ? booking.participants.slice() : [];
     const idx = participants.indexOf(memberId);
+    let joined = false;
     if (idx >= 0) {
       participants.splice(idx, 1);
     } else {
@@ -690,6 +814,7 @@ async function apiPost(route, body = {}) {
         throw new Error('Toutes les places sont déjà prises sur ce créneau.');
       }
       participants.push(memberId);
+      joined = true;
     }
 
     const { error } = await sbClient
@@ -697,11 +822,13 @@ async function apiPost(route, body = {}) {
       .update({ participants })
       .eq('id', booking.id);
     throwIfSupabaseError(error, 'Impossible de modifier l\'inscription.');
+    await logActivity(memberId, booking.type === 'chantier' ? 'materiel' : 'sortie', `${joined ? '✋' : '↩️'} ${getMember(memberId).name} ${joined ? 'rejoint' : 'quitte'} « ${booking.title} ».`);
     await loadAllState();
     return appState;
   }
 
   if (route === '/api/bookings/delete') {
+    const existing = appState?.bookings?.find((b) => b.id === body.bookingId);
     const { data, error } = await sbClient
       .from('bookings')
       .delete()
@@ -710,6 +837,10 @@ async function apiPost(route, body = {}) {
     throwIfSupabaseError(error, 'Impossible d\'annuler ce créneau.');
     if (!data || data.length === 0) {
       throw new Error('Créneau introuvable.');
+    }
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || 'anthony';
+    if (existing) {
+      await logActivity(actorId, existing.type === 'chantier' ? 'materiel' : 'sortie', `🗑️ ${getMember(actorId).name} a annulé le créneau « ${existing.title} ».`);
     }
     await loadAllState();
     return appState;
@@ -770,6 +901,7 @@ async function apiPost(route, body = {}) {
         .eq('id', 1);
       throwIfSupabaseError(updErr, 'Impossible de mettre à jour la jauge.');
 
+      await logActivity(authorId, 'materiel', `⛽ ${getMember(authorId).name} a ajouté ${addedLiters.toFixed(1)} L d'essence dans la nourrice.`);
       await loadAllState();
       return appState;
     }
@@ -807,7 +939,7 @@ async function apiPost(route, body = {}) {
       end_kg: Number(endKg.toFixed(2)),
       liters_used: litersUsed,
       cost_eur: costEur,
-      note: cleanStr(body.note, 240) || 'Pesée de sortie enregistrée'
+      note: cleanStr(body.note, 240) || 'Pesée au peson enregistrée'
     });
     throwIfSupabaseError(logErr, 'Impossible d\'enregistrer la pesée.');
 
@@ -817,6 +949,7 @@ async function apiPost(route, body = {}) {
       .eq('id', 1);
     throwIfSupabaseError(updErr, 'Impossible de mettre à jour la jauge.');
 
+    await logActivity(authorMemberId, 'materiel', `⛽ ${getMember(authorMemberId).name} a enregistré une pesée d'essence : ${litersUsed.toFixed(2)} L (${crewNames}).`);
     await loadAllState();
     return appState;
   }
@@ -848,6 +981,7 @@ async function apiPost(route, body = {}) {
         })
         .eq('id', existing.id);
       throwIfSupabaseError(error, 'Impossible de modifier l\'article de Charte.');
+      await logActivity(memberId, 'info', `📜 ${getMember(memberId).name} a mis à jour la Charte : « ${title} ».`);
     } else {
       const { error } = await sbClient.from('charter_sections').insert({
         id: makeId('ch'),
@@ -859,6 +993,7 @@ async function apiPost(route, body = {}) {
         history: [{ authorId: memberId, date: nowIso, note: 'Création de l\'article' }]
       });
       throwIfSupabaseError(error, 'Impossible de créer l\'article de Charte.');
+      await logActivity(memberId, 'info', `📜 ${getMember(memberId).name} a ajouté un article à la Charte : « ${title} ».`);
     }
 
     await loadAllState();
@@ -882,6 +1017,7 @@ async function apiPost(route, body = {}) {
       created_at: nowIso
     });
     throwIfSupabaseError(error, 'Impossible d\'ajouter cette idée.');
+    await logActivity(authorId, 'info', `💡 ${getMember(authorId).name} a posé une idée sur le Frigo : « ${title} ».`);
     await loadAllState();
     return appState;
   }
@@ -934,7 +1070,113 @@ async function apiPost(route, body = {}) {
       image_url: imageUrl,
       created_at: nowIso
     });
-    throwIfSupabaseError(error, 'Impossible de publier dans le journal de bord.');
+    throwIfSupabaseError(error, 'Impossible de publier dans le journal de nav.');
+    await logActivity(authorId, 'sortie', `📓 ${getMember(authorId).name} a ajouté une sortie au Journal de nav : « ${title} ».`);
+    await loadAllState();
+    return appState;
+  }
+
+  if (route === '/api/todos') {
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || 'anthony';
+    const action = body.action || 'add';
+
+    if (action === 'add') {
+      const title = cleanStr(body.title, 160);
+      if (!title) throw new Error('Merci d\'indiquer l\'intitulé de la course ou tâche.');
+      const kind = body.kind === 'tache' ? 'tache' : 'course';
+      const { error } = await sbClient.from('todos').insert({
+        id: makeId('todo'),
+        title,
+        kind,
+        done: false,
+        author_id: actorId,
+        note: cleanStr(body.note, 260),
+        created_at: nowIso
+      });
+      throwIfSupabaseError(error, 'Impossible d\'ajouter à la liste.');
+      await logActivity(actorId, 'materiel', `🛒 ${getMember(actorId).name} a ajouté ${kind === 'course' ? 'à la liste de courses' : 'à la To-Do'} : « ${title} ».`);
+      await loadAllState();
+      return appState;
+    }
+
+    if (action === 'toggle') {
+      const item = await fetchSingleRow('todos', body.todoId);
+      const nextDone = !item.done;
+      const { error } = await sbClient
+        .from('todos')
+        .update({
+          done: nextDone,
+          done_by: nextDone ? actorId : null,
+          done_at: nextDone ? nowIso : null
+        })
+        .eq('id', item.id);
+      throwIfSupabaseError(error, 'Impossible de mettre à jour la tâche.');
+      if (nextDone) {
+        await logActivity(actorId, 'materiel', `✅ ${getMember(actorId).name} a coché « ${item.title} ».`);
+      }
+      await loadAllState();
+      return appState;
+    }
+
+    if (action === 'delete') {
+      const { error } = await sbClient.from('todos').delete().eq('id', body.todoId);
+      throwIfSupabaseError(error, 'Impossible de supprimer cet élément.');
+      await loadAllState();
+      return appState;
+    }
+
+    throw new Error('Action To-Do inconnue.');
+  }
+
+  if (route === '/api/photos') {
+    const actorId = cleanStr(body.memberId, 40) || currentMemberId || 'anthony';
+    const action = body.action || 'add';
+
+    if (action === 'delete') {
+      const { error } = await sbClient.from('photos').delete().eq('id', body.photoId);
+      throwIfSupabaseError(error, 'Impossible de supprimer cette photo.');
+      await loadAllState();
+      return appState;
+    }
+
+    const title = cleanStr(body.title, 140);
+    if (!title || !body.imageData) {
+      throw new Error('Merci d\'indiquer une légende et de choisir une photo.');
+    }
+    const allowedCats = ['navigation', 'chantier', 'collectif'];
+    const category = allowedCats.includes(body.category) ? body.category : 'navigation';
+    const photoId = makeId('ph');
+    const imageUrl = await uploadCompressedPhoto('album', photoId, body.imageData);
+
+    const { error } = await sbClient.from('photos').insert({
+      id: photoId,
+      title,
+      category,
+      author_id: actorId,
+      image_url: imageUrl,
+      taken_on: cleanStr(body.takenOn, 20) || nowIso.slice(0, 10),
+      created_at: nowIso
+    });
+    throwIfSupabaseError(error, 'Impossible de publier la photo dans l\'album.');
+    await logActivity(actorId, 'photo', `📸 ${getMember(actorId).name} a ajouté une photo dans l'album : « ${title} ».`);
+    await loadAllState();
+    return appState;
+  }
+
+  if (route === '/api/member/avatar') {
+    const memberId = cleanStr(body.memberId, 40) || currentMemberId;
+    if (!memberId) throw new Error('Membre introuvable.');
+    const avatarUrl = typeof body.avatarUrl === 'string' && body.avatarUrl.startsWith('data:image/')
+      ? body.avatarUrl.slice(0, 45000)
+      : '';
+    const { error } = await sbClient
+      .from('members')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', memberId);
+    throwIfSupabaseError(error, 'Impossible de mettre à jour la photo de profil.');
+    if (avatarUrl) {
+      await logActivity(memberId, 'info', `📷 ${getMember(memberId).name} a ajouté sa photo de profil.`);
+    }
     await loadAllState();
     return appState;
   }
@@ -968,6 +1210,7 @@ async function apiPost(route, body = {}) {
           })
           .eq('id', existing.id);
         throwIfSupabaseError(error, 'Impossible de mettre à jour le document.');
+        await logActivity(memberId, 'info', `🤝 ${getMember(memberId).name} a mis à jour « ${title} ».`);
       } else {
         const { error } = await sbClient.from('collab_docs').insert({
           id: makeId('doc'),
@@ -982,6 +1225,7 @@ async function apiPost(route, body = {}) {
           proposals: []
         });
         throwIfSupabaseError(error, 'Impossible de créer le document.');
+        await logActivity(memberId, 'info', `🤝 ${getMember(memberId).name} a ajouté un document : « ${title} ».`);
       }
       await loadAllState();
       return appState;
@@ -997,6 +1241,7 @@ async function apiPost(route, body = {}) {
         .update({ status: nextStatus, updated_by: memberId, updated_at: nowIso })
         .eq('id', doc.id);
       throwIfSupabaseError(error, 'Impossible de changer le statut du document.');
+      await logActivity(memberId, 'info', `🔄 ${getMember(memberId).name} a passé « ${doc.title} » en statut ${nextStatus}.`);
       await loadAllState();
       return appState;
     }
@@ -1020,6 +1265,7 @@ async function apiPost(route, body = {}) {
         .update({ proposals })
         .eq('id', doc.id);
       throwIfSupabaseError(error, 'Impossible d\'ajouter la proposition.');
+      await logActivity(memberId, 'info', `💬 ${getMember(memberId).name} a ajouté une proposition sur « ${doc.title} ».`);
       await loadAllState();
       return appState;
     }
@@ -1332,9 +1578,31 @@ function openProfileDialog() {
 function renderMemberPicker() {
   const grid = $('#member-picker-grid');
   if (!grid || !appState) return;
+
+  const uploadBox = $('#avatar-upload-box');
+  const validMember = currentMemberId && appState.members.find((m) => m.id === currentMemberId);
+  if (uploadBox) {
+    if (validMember) {
+      uploadBox.hidden = false;
+      const preview = $('#profile-avatar-preview');
+      if (validMember.avatarUrl) {
+        preview.innerHTML = `<img src="${escapeHtml(validMember.avatarUrl)}" alt="${escapeHtml(validMember.name)}" class="avatar-img">`;
+        preview.style.background = 'transparent';
+        $('#btn-remove-avatar').hidden = false;
+      } else {
+        preview.textContent = validMember.short;
+        preview.style.background = validMember.color;
+        $('#btn-remove-avatar').hidden = true;
+      }
+      $('#profile-avatar-name').textContent = validMember.name;
+    } else {
+      uploadBox.hidden = true;
+    }
+  }
+
   grid.innerHTML = appState.members.map((m) => `
     <button type="button" class="member-pick-btn ${m.id === currentMemberId ? 'is-selected' : ''}" data-pick-member="${escapeHtml(m.id)}">
-      <span class="avatar-dot" style="background:${escapeHtml(m.color)}">${escapeHtml(m.short)}</span>
+      ${renderAvatarDotHtml(m, 34, '0.82rem')}
       <span>${escapeHtml(m.name)}</span>
     </button>
   `).join('');
@@ -1345,10 +1613,15 @@ function renderHeaderProfile() {
   const avatar = $('#header-avatar');
   const label = $('#header-member-name');
   if (validMember) {
-    avatar.textContent = validMember.short;
-    avatar.style.background = validMember.color;
+    if (validMember.avatarUrl) {
+      avatar.innerHTML = `<img src="${escapeHtml(validMember.avatarUrl)}" alt="${escapeHtml(validMember.name)}" class="avatar-img">`;
+      avatar.style.background = 'transparent';
+    } else {
+      avatar.textContent = validMember.short;
+      avatar.style.background = validMember.color;
+    }
     label.textContent = `${validMember.name} ✎`;
-    $('#btn-open-profile').title = 'Se corriger / changer de prénom';
+    $('#btn-open-profile').title = 'Se corriger / changer de prénom ou photo';
   } else {
     avatar.textContent = '?';
     avatar.style.background = '#64748b';
@@ -1425,7 +1698,7 @@ function renderBoatView() {
     crewRow.hidden = false;
     crewChips.innerHTML = displayCrew.map((id) => {
       const m = getMember(id);
-      return `<span class="member-chip"><span class="avatar-dot" style="background:${escapeHtml(m.color)};width:20px;height:20px;font-size:0.68rem">${escapeHtml(m.short)}</span> ${escapeHtml(m.name)}</span>`;
+      return `<span class="member-chip">${renderAvatarDotHtml(m, 20, '0.68rem')} ${escapeHtml(m.name)}</span>`;
     }).join('');
   } else {
     crewRow.hidden = true;
@@ -1494,13 +1767,23 @@ function renderBoatView() {
   const eco = appState.ecopage;
   const respId = eco.rotationOrder[eco.currentIndex] || 'fred';
   const resp = getMember(respId);
-  const lastBy = getMember(eco.lastCheckedBy);
-  $('#ecopage-avatar').textContent = resp.short;
-  $('#ecopage-avatar').style.background = resp.color;
+  const ecoAvatar = $('#ecopage-avatar');
+  if (resp.avatarUrl) {
+    ecoAvatar.innerHTML = `<img src="${escapeHtml(resp.avatarUrl)}" alt="${escapeHtml(resp.name)}" class="avatar-img">`;
+    ecoAvatar.style.background = 'transparent';
+  } else {
+    ecoAvatar.textContent = resp.short;
+    ecoAvatar.style.background = resp.color;
+  }
   $('#ecopage-who').textContent = respId === currentMemberId
     ? `Responsable cette semaine : ${resp.name} (C'est votre tour !)`
     : `Responsable cette semaine : ${resp.name}`;
-  $('#ecopage-last').textContent = `Dernière visite : par ${lastBy.name} (${formatRelativeTime(eco.lastCheckedAt)})`;
+  if (eco.lastCheckedBy && eco.lastCheckedAt) {
+    const lastBy = getMember(eco.lastCheckedBy);
+    $('#ecopage-last').textContent = `Dernière visite : par ${lastBy.name} (${formatRelativeTime(eco.lastCheckedAt)})`;
+  } else {
+    $('#ecopage-last').textContent = 'Dernière visite : aucune pour le moment (démarrage après chantier)';
+  }
   $('#ecopage-note').textContent = eco.stateNote || 'Aucun commentaire.';
   $('#ecopage-rotation-list').innerHTML = eco.rotationOrder.map((id, idx) => {
     const m = getMember(id);
@@ -1588,7 +1871,7 @@ function renderBookingCardHtml(b) {
 
   const participantsHtml = b.participants.map((id) => {
     const m = getMember(id);
-    return `<span class="member-chip"><span class="avatar-dot" style="background:${escapeHtml(m.color)};width:20px;height:20px;font-size:0.68rem">${escapeHtml(m.short)}</span> ${escapeHtml(m.name)}</span>`;
+    return `<span class="member-chip">${renderAvatarDotHtml(m, 20, '0.68rem')} ${escapeHtml(m.name)}</span>`;
   }).join('');
 
   return `
@@ -1716,6 +1999,84 @@ function renderMonthPlanning(items) {
   `;
 }
 
+function computePriorityStats() {
+  const cfg = appState?.priorityConfig || {
+    weekdayPerHour: 1,
+    weekendPerHour: 2.5,
+    openDiscount: 0.5,
+    lastMinuteFree: true,
+    includeChantier: false
+  };
+  const stats = new Map();
+  for (const m of appState?.members || []) {
+    stats.set(m.id, { member: m, weekH: 0, weekendH: 0, waterH: 0, chantierH: 0, units: 0 });
+  }
+
+  for (const b of appState?.bookings || []) {
+    const h = calcBookingHours(b);
+    const wk = isWeekendDate(b.date);
+    for (const pid of b.participants) {
+      const s = stats.get(pid);
+      if (!s) continue;
+      if (b.type === 'chantier') {
+        s.chantierH += h;
+        if (cfg.includeChantier) {
+          s.units -= h * 0.5;
+        }
+      } else {
+        s.waterH += h;
+        if (wk) s.weekendH += h;
+        else s.weekH += h;
+        if (!(cfg.lastMinuteFree && b.isLastMinute)) {
+          const rate = wk ? cfg.weekendPerHour : cfg.weekdayPerHour;
+          const mult = b.type === 'open' ? (1 - cfg.openDiscount) : 1;
+          s.units += h * rate * mult;
+        }
+      }
+    }
+  }
+
+  const ordered = Array.from(stats.values()).sort((a, b) => {
+    if (Math.abs(a.units - b.units) > 0.01) return a.units - b.units;
+    if (Math.abs(b.chantierH - a.chantierH) > 0.01) return b.chantierH - a.chantierH;
+    return a.member.name.localeCompare(b.member.name, 'fr');
+  });
+
+  return { cfg, stats, ordered };
+}
+
+function renderPriorityOrder() {
+  if (!appState) return;
+  const listEl = $('#priority-order-list');
+  if (!listEl) return;
+
+  const { cfg, ordered } = computePriorityStats();
+  listEl.innerHTML = ordered.map((s, idx) => {
+    const unitsTxt = `${s.units.toFixed(1)} u`;
+    const details = `Eau ${s.waterH.toFixed(1)}h (sem. ${s.weekH.toFixed(1)}h / WE ${s.weekendH.toFixed(1)}h) • Chantier ${s.chantierH.toFixed(1)}h`;
+    return `
+      <li class="priority-item">
+        <div style="display:flex;align-items:center;gap:0.5rem;min-width:0;">
+          <span class="priority-rank">#${idx + 1}</span>
+          ${renderAvatarDotHtml(s.member, 26, '0.72rem')}
+          <div style="min-width:0;">
+            <div><strong>${escapeHtml(s.member.name)}</strong></div>
+            <div class="muted-text" style="font-size:0.8rem;">${details}</div>
+          </div>
+        </div>
+        <span class="badge-soft">${escapeHtml(unitsTxt)}</span>
+      </li>
+    `;
+  }).join('');
+
+  if (document.activeElement?.closest('#form-priority-config')) return;
+  if ($('#prio-weekday')) $('#prio-weekday').value = String(cfg.weekdayPerHour);
+  if ($('#prio-weekend')) $('#prio-weekend').value = String(cfg.weekendPerHour);
+  if ($('#prio-open-discount')) $('#prio-open-discount').value = String(cfg.openDiscount);
+  if ($('#prio-last-minute')) $('#prio-last-minute').checked = Boolean(cfg.lastMinuteFree);
+  if ($('#prio-include-chantier')) $('#prio-include-chantier').checked = Boolean(cfg.includeChantier);
+}
+
 function renderPlanningView() {
   if (!appState) return;
   const items = getFilteredBookings();
@@ -1736,14 +2097,16 @@ function renderPlanningView() {
   if (activePlanningView === 'list') {
     if (items.length === 0) {
       listEl.innerHTML = `<div class="card"><p class="muted-text">Aucun créneau dans cette catégorie pour le moment. Touchez le bouton ci-dessus pour en proposer un !</p></div>`;
-      return;
+    } else {
+      listEl.innerHTML = items.map((b) => renderBookingCardHtml(b)).join('');
     }
-    listEl.innerHTML = items.map((b) => renderBookingCardHtml(b)).join('');
   } else if (activePlanningView === 'week') {
     renderWeekPlanning(items);
   } else {
     renderMonthPlanning(items);
   }
+
+  renderPriorityOrder();
 }
 
 // Rendu Onglet 3 : Essence & Mesure en heures
@@ -1769,11 +2132,11 @@ function renderEssenceView() {
   $('#fuel-gauge-fill').style.width = `${pct}%`;
 
   const isScale = fuel.mode === 'scale';
-  $('#fuel-mode-badge').textContent = isScale ? 'Option 1 : Balance' : 'Option 2 : Repère';
+  $('#fuel-mode-badge').textContent = isScale ? 'Option 1 : Peson' : 'Option 2 : Repère';
   $('#btn-mode-scale').classList.toggle('is-active', isScale);
   $('#btn-mode-mark').classList.toggle('is-active', !isScale);
   $('#fuel-mode-desc').textContent = isScale
-    ? 'Option 1 activée : pesez la nourrice sur la balance au départ et au retour (densité essence : 0,75 kg/L).'
+    ? 'Option 1 activée : accrochez et soulevez la nourrice dans le vide au peson numérique au départ et au retour (densité : 0,75 kg/L).'
     : 'Option 2 activée : chacun refait le plein jusqu\'au repère depuis les bidons à La Rabouilleuse (vous pouvez quand même noter vos litres ici).';
 
   // Sélecteur de balade du planning & pré-remplissage des co-usagers
@@ -1935,10 +2298,10 @@ function updateFuelLivePreview() {
   }
 }
 
-// Rendu Onglet 4 : Journal de bord, Charte, Frigo, Docs collaboratifs & Fiches
+// Rendu Onglet 4 : Vie quotidienne (9 dossiers façon Drive)
 function switchDocsSubtab(subtab) {
   activeDocsTab = subtab;
-  for (const b of $$('#docs-subtabs .chip-filter')) {
+  for (const b of $$('#docs-subtabs [data-docstab]')) {
     b.classList.toggle('is-active', b.dataset.docstab === activeDocsTab);
   }
   for (const pane of $$('.doc-pane')) {
@@ -1946,18 +2309,30 @@ function switchDocsSubtab(subtab) {
   }
 }
 
+function renderGuideAccordionHtml(guides, groupName) {
+  return guides.map((g, idx) => `
+    <details class="guide-details" name="${escapeHtml(groupName)}" ${idx === 0 ? 'open' : ''}>
+      <summary>${g.icon === '⛵' ? BOAT_ICO : escapeHtml(g.icon)} ${escapeHtml(g.title)}</summary>
+      <p class="muted-text" style="margin-top:0.5rem">${escapeHtml(g.summary)}</p>
+      <ol class="guide-steps">
+        ${g.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
+      </ol>
+    </details>
+  `).join('');
+}
+
 function renderCharteView() {
   if (!appState) return;
 
-  // Journal de bord
+  // 1. Journal de navigation (100 % nav)
   const entries = appState.logbookEntries || [];
   $('#logbook-list').innerHTML = entries.length === 0
-    ? '<div class="card"><p class="muted-text" style="margin:0">Aucune sortie racontée pour l\'instant. Touchez le bouton ci-dessus pour ouvrir le journal !</p></div>'
+    ? '<div class="card"><p class="muted-text" style="margin:0">Aucune navigation racontée pour l\'instant. Touchez « + Raconter une navigation » !</p></div>'
     : entries.map((entry) => {
         const author = getMember(entry.authorId);
         const crewChips = (entry.crew || [entry.authorId]).map((id) => {
           const m = getMember(id);
-          return `<span class="member-chip"><span class="avatar-dot" style="background:${escapeHtml(m.color)};width:20px;height:20px;font-size:0.68rem">${escapeHtml(m.short)}</span> ${escapeHtml(m.name)}</span>`;
+          return `<span class="member-chip">${renderAvatarDotHtml(m, 20, '0.68rem')} ${escapeHtml(m.name)}</span>`;
         }).join('');
         return `
           <article class="card">
@@ -1967,7 +2342,7 @@ function renderCharteView() {
             </div>
             <h3>${escapeHtml(entry.title)}</h3>
             <p>${escapeHtml(entry.story)}</p>
-            ${entry.boatNotes ? `<div class="logbook-notes"><strong>🔧 Notes bateau :</strong> ${escapeHtml(entry.boatNotes)}</div>` : ''}
+            ${entry.boatNotes ? `<div class="logbook-notes"><strong>⛵ Notes nav / bateau :</strong> ${escapeHtml(entry.boatNotes)}</div>` : ''}
             ${entry.imageData ? `<img src="${entry.imageData}" alt="Souvenir de ${escapeHtml(entry.title)}" class="msg-photo" loading="lazy">` : ''}
             <div class="crew-row" style="margin-top:0.75rem;margin-bottom:0;">
               <span class="crew-label">Récit de ${escapeHtml(author.name)} • Équipage :</span>
@@ -1977,7 +2352,41 @@ function renderCharteView() {
         `;
       }).join('');
 
-  // Charte
+  // 2. To-Do & Liste de courses
+  const todos = (appState.todos || []).filter((t) => {
+    if (activeTodoFilter === 'open') return !t.done;
+    if (activeTodoFilter === 'course') return t.kind === 'course';
+    if (activeTodoFilter === 'tache') return t.kind === 'tache';
+    return true;
+  });
+  $('#todos-list').innerHTML = todos.length === 0
+    ? '<div class="card"><p class="muted-text" style="margin:0">Rien à afficher dans cette vue pour le moment.</p></div>'
+    : todos.map((t) => {
+        const author = getMember(t.authorId);
+        const doneBy = t.doneBy ? getMember(t.doneBy).name : '';
+        const badge = t.kind === 'course'
+          ? '<span class="badge-pill badge-free">🛒 Achat / Course</span>'
+          : '<span class="badge-pill badge-chantier">🛠️ Tâche</span>';
+        return `
+          <article class="card todo-item ${t.done ? 'is-done' : ''}">
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;min-width:0;flex:1;">
+              <button type="button" class="todo-check-btn" data-toggle-todo="${escapeHtml(t.id)}" aria-label="${t.done ? 'Marquer à faire' : 'Marquer fait'}">${t.done ? '✓' : ''}</button>
+              <div style="min-width:0;flex:1;">
+                <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.25rem;">
+                  ${badge}
+                  <span class="muted-text" style="font-size:0.82rem;">Ajouté par ${escapeHtml(author.name)}</span>
+                </div>
+                <div class="todo-title" style="font-weight:700;">${escapeHtml(t.title)}</div>
+                ${t.note ? `<p class="muted-text" style="margin:0.25rem 0 0;font-size:0.88rem;">${escapeHtml(t.note)}</p>` : ''}
+                ${t.done && doneBy ? `<p class="muted-text" style="margin:0.25rem 0 0;font-size:0.82rem;">✅ Fait par ${escapeHtml(doneBy)}</p>` : ''}
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" data-delete-todo="${escapeHtml(t.id)}" aria-label="Supprimer">🗑️</button>
+          </article>
+        `;
+      }).join('');
+
+  // 3. Charte interne
   $('#charter-list').innerHTML = appState.charterSections.map((sec) => {
     const author = getMember(sec.updatedBy);
     const historyHtml = (sec.history || []).map((h) => {
@@ -1993,127 +2402,161 @@ function renderCharteView() {
         </div>
         <p>${escapeHtml(sec.content)}</p>
         <p class="muted-text">Dernière mise à jour par <strong>${escapeHtml(author.name)}</strong> (${formatRelativeTime(sec.updatedAt)})</p>
-        <details class="mini-details">
-          <summary>Historique des modifications (${(sec.history || []).length})</summary>
-          <ul class="clean-list">${historyHtml}</ul>
-        </details>
+        ${historyHtml ? `
+          <details class="mini-details">
+            <summary>Historique des modifications (${(sec.history || []).length})</summary>
+            <ul class="clean-list">${historyHtml}</ul>
+          </details>
+        ` : ''}
       </article>
     `;
   }).join('');
 
+  // 4. Frigo à idées
   const statusLabels = {
     discussion: '💬 En discussion',
     test: '🧪 En test',
     acte: '✅ Acté !'
   };
 
-  $('#ideas-list').innerHTML = appState.ideas.map((idea) => {
-    const author = getMember(idea.authorId);
-    const hasVoted = currentMemberId && idea.votes.includes(currentMemberId);
-    return `
-      <article class="card">
-        <div class="card-head">
-          <span class="badge-soft">${statusLabels[idea.status] || idea.status}</span>
-          <span class="muted-text">Proposé par ${escapeHtml(author.name)}</span>
-        </div>
-        <h3>${escapeHtml(idea.title)}</h3>
-        ${idea.description ? `<p class="muted-text">${escapeHtml(idea.description)}</p>` : ''}
-        <div class="inline-actions">
-          <button type="button" class="btn ${hasVoted ? 'btn-primary' : 'btn-outline'} btn-sm" data-vote-idea="${escapeHtml(idea.id)}">
-            👍 Moi aussi (${idea.votes.length})
-          </button>
-          <button type="button" class="btn btn-outline btn-sm" data-cycle-idea="${escapeHtml(idea.id)}">
-            🔄 Changer statut
-          </button>
-        </div>
-      </article>
-    `;
-  }).join('');
+  $('#ideas-list').innerHTML = appState.ideas.length === 0
+    ? '<div class="card"><p class="muted-text" style="margin:0">Le frigo est vide pour le moment. Touchez « 💡 Poser une idée » pour lancer une suggestion !</p></div>'
+    : appState.ideas.map((idea) => {
+        const author = getMember(idea.authorId);
+        const hasVoted = currentMemberId && idea.votes.includes(currentMemberId);
+        return `
+          <article class="card">
+            <div class="card-head">
+              <span class="badge-soft">${statusLabels[idea.status] || idea.status}</span>
+              <span class="muted-text">Proposé par ${escapeHtml(author.name)}</span>
+            </div>
+            <h3>${escapeHtml(idea.title)}</h3>
+            ${idea.description ? `<p class="muted-text">${escapeHtml(idea.description)}</p>` : ''}
+            <div class="inline-actions">
+              <button type="button" class="btn ${hasVoted ? 'btn-primary' : 'btn-outline'} btn-sm" data-vote-idea="${escapeHtml(idea.id)}">
+                👍 Moi aussi (${idea.votes.length})
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" data-cycle-idea="${escapeHtml(idea.id)}">
+                🔄 Changer statut
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('');
 
-  // Convention, CR & Documents collaboratifs (type Trello)
+  // 5. Convention La Rabouilleuse (docs collaboratifs)
   const docStatusLabels = {
     draft: '📝 Brouillon',
     review: '💬 En relecture',
     validated: '✅ Validé'
   };
   const docs = appState.collabDocs || [];
-  $('#collab-docs-list').innerHTML = docs.map((doc) => {
-    const updAuthor = getMember(doc.updatedBy);
-    const proposals = doc.proposals || [];
-    const proposalsHtml = proposals.length === 0
-      ? '<p class="muted-text" style="margin:0.35rem 0 0;">Aucune proposition supplémentaire pour l\'instant.</p>'
-      : proposals.map((p) => {
-          const pAuthor = getMember(p.authorId);
-          const votes = Array.isArray(p.votes) ? p.votes : [];
-          const hasVoted = currentMemberId && votes.includes(currentMemberId);
-          return `
-            <div class="proposal-item ${p.integrated ? 'is-integrated' : ''}">
-              <div class="proposal-head">
-                <div style="display:flex;align-items:center;gap:0.35rem;">
-                  <span class="avatar-dot" style="background:${escapeHtml(pAuthor.color)};width:22px;height:22px;font-size:0.68rem">${escapeHtml(pAuthor.short)}</span>
-                  <strong>${escapeHtml(pAuthor.name)}</strong>
-                  <span class="muted-text">• ${formatRelativeTime(p.createdAt)}</span>
+  $('#collab-docs-list').innerHTML = docs.length === 0
+    ? '<div class="card"><p class="muted-text" style="margin:0">Aucun document pour l\'instant.</p></div>'
+    : docs.map((doc) => {
+        const updAuthor = getMember(doc.updatedBy);
+        const proposals = doc.proposals || [];
+        const proposalsHtml = proposals.length === 0
+          ? '<p class="muted-text" style="margin:0.35rem 0 0;">Aucune proposition supplémentaire pour l\'instant.</p>'
+          : proposals.map((p) => {
+              const pAuthor = getMember(p.authorId);
+              const votes = Array.isArray(p.votes) ? p.votes : [];
+              const hasVoted = currentMemberId && votes.includes(currentMemberId);
+              return `
+                <div class="proposal-item ${p.integrated ? 'is-integrated' : ''}">
+                  <div class="proposal-head">
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                      ${renderAvatarDotHtml(pAuthor, 22, '0.68rem')}
+                      <strong>${escapeHtml(pAuthor.name)}</strong>
+                      <span class="muted-text">• ${formatRelativeTime(p.createdAt)}</span>
+                    </div>
+                    ${p.integrated ? '<span class="badge-pill badge-open">✅ Intégrée</span>' : ''}
+                  </div>
+                  <p style="margin:0 0 0.45rem;">${escapeHtml(p.text)}</p>
+                  <div class="inline-actions">
+                    <button type="button" class="react-btn ${hasVoted ? 'is-active' : ''}" data-vote-proposal="${escapeHtml(doc.id)}|${escapeHtml(p.id)}">👍 D'accord (${votes.length})</button>
+                    <button type="button" class="react-btn ${p.integrated ? 'is-active' : ''}" data-integrate-proposal="${escapeHtml(doc.id)}|${escapeHtml(p.id)}">${p.integrated ? '✓ Intégrée' : '✅ Marquer intégré'}</button>
+                  </div>
                 </div>
-                ${p.integrated ? '<span class="badge-pill badge-open">✅ Intégrée</span>' : ''}
-              </div>
-              <p style="margin:0 0 0.45rem;">${escapeHtml(p.text)}</p>
-              <div class="inline-actions">
-                <button type="button" class="react-btn ${hasVoted ? 'is-active' : ''}" data-vote-proposal="${escapeHtml(doc.id)}|${escapeHtml(p.id)}">👍 D'accord (${votes.length})</button>
-                <button type="button" class="react-btn ${p.integrated ? 'is-active' : ''}" data-integrate-proposal="${escapeHtml(doc.id)}|${escapeHtml(p.id)}">${p.integrated ? '✓ Intégrée' : '✅ Marquer intégré'}</button>
-              </div>
-            </div>
-          `;
+              `;
+            }).join('');
+
+        const historyHtml = (doc.history || []).map((h) => {
+          const hm = getMember(h.authorId);
+          return `<li><strong>${escapeHtml(hm.name)}</strong> (${formatRelativeTime(h.date)}) : ${escapeHtml(h.note)}</li>`;
         }).join('');
 
-    const historyHtml = (doc.history || []).map((h) => {
-      const hm = getMember(h.authorId);
-      return `<li><strong>${escapeHtml(hm.name)}</strong> (${formatRelativeTime(h.date)}) : ${escapeHtml(h.note)}</li>`;
-    }).join('');
+        return `
+          <article class="card">
+            <div class="card-head">
+              <button type="button" class="badge-soft" style="border:1px solid var(--border);cursor:pointer;" data-cycle-doc="${escapeHtml(doc.id)}" title="Cliquer pour changer le statut">${docStatusLabels[doc.status] || doc.status} 🔄</button>
+              <span class="muted-text">Dernière édit : <strong>${escapeHtml(updAuthor.name)}</strong></span>
+            </div>
+            <h3>${escapeHtml(doc.title)}</h3>
+            <p>${escapeHtml(doc.content)}</p>
+            <div class="inline-actions">
+              <button type="button" class="btn btn-outline btn-sm" data-edit-collab-doc="${escapeHtml(doc.id)}">✏️ Éditer le document</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-add-proposal="${escapeHtml(doc.id)}">+ Ajouter une proposition</button>
+            </div>
 
-    return `
-      <article class="card">
-        <div class="card-head">
-          <button type="button" class="badge-soft" style="border:1px solid var(--border);cursor:pointer;" data-cycle-doc="${escapeHtml(doc.id)}" title="Cliquer pour changer le statut">${docStatusLabels[doc.status] || doc.status} 🔄</button>
-          <span class="muted-text">Dernière édit : <strong>${escapeHtml(updAuthor.name)}</strong></span>
-        </div>
-        <h3>${escapeHtml(doc.title)}</h3>
-        <p>${escapeHtml(doc.content)}</p>
-        <div class="inline-actions">
-          <button type="button" class="btn btn-outline btn-sm" data-edit-collab-doc="${escapeHtml(doc.id)}">✏️ Éditer le document</button>
-          <button type="button" class="btn btn-secondary btn-sm" data-add-proposal="${escapeHtml(doc.id)}">+ Ajouter une proposition</button>
-        </div>
+            <div class="proposals-box">
+              <strong>💡 Propositions supplémentaires (${proposals.length})</strong>
+              ${proposalsHtml}
+            </div>
 
-        <div class="proposals-box">
-          <strong>💡 Propositions supplémentaires (${proposals.length})</strong>
-          ${proposalsHtml}
-        </div>
+            ${historyHtml ? `
+              <details class="mini-details">
+                <summary>Historique des modifications (${(doc.history || []).length})</summary>
+                <ul class="clean-list">${historyHtml}</ul>
+              </details>
+            ` : ''}
+          </article>
+        `;
+      }).join('');
 
-        <details class="mini-details">
-          <summary>Historique des modifications (${(doc.history || []).length})</summary>
-          <ul class="clean-list">${historyHtml}</ul>
-        </details>
-      </article>
-    `;
-  }).join('');
+  // 6 & 7. Sécurité à bord & Fiches techniques
+  const safetyGuides = appState.guides.filter((g) => g.section === 'safety');
+  const techGuides = appState.guides.filter((g) => g.section === 'tech');
+  $('#safety-guides-list').innerHTML = renderGuideAccordionHtml(safetyGuides, 'fiche-securite');
+  $('#tech-guides-list').innerHTML = renderGuideAccordionHtml(techGuides, 'fiche-technique');
 
-  $('#guides-list').innerHTML = appState.guides.map((g, idx) => `
-    <details class="guide-details" name="fiche-technique" ${idx === 0 ? 'open' : ''}>
-      <summary>${g.icon === '⛵' ? BOAT_ICO : escapeHtml(g.icon)} ${escapeHtml(g.title)}</summary>
-      <p class="muted-text" style="margin-top:0.5rem">${escapeHtml(g.summary)}</p>
-      <ol class="guide-steps">
-        ${g.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
-      </ol>
-    </details>
-  `).join('');
+  // 8. Album photo
+  const filteredPhotos = (appState.photos || []).filter((p) => (
+    activePhotoFilter === 'all' ? true : p.category === activePhotoFilter
+  ));
+  const photoCatBadges = {
+    navigation: '⛵ Navigation',
+    chantier: '🛠️ Chantier',
+    collectif: '🤝 Collectif'
+  };
+  $('#photos-grid').innerHTML = filteredPhotos.length === 0
+    ? '<div class="card" style="grid-column:1/-1;"><p class="muted-text" style="margin:0">Aucune photo dans ce dossier pour le moment. Touchez « + Ajouter une photo » pour lancer l\'album du collectif !</p></div>'
+    : filteredPhotos.map((p) => {
+        const author = getMember(p.authorId);
+        return `
+          <article class="card photo-card">
+            ${p.imageData ? `<img src="${p.imageData}" alt="${escapeHtml(p.title)}" loading="lazy">` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+              <span class="badge-soft">${photoCatBadges[p.category] || '📸 Photo'}</span>
+              <span class="muted-text" style="font-size:0.8rem;">${escapeHtml(formatDateFr(p.takenOn))}</span>
+            </div>
+            <strong style="display:block;margin-bottom:0.4rem;">${escapeHtml(p.title)}</strong>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
+              <span class="member-chip">${renderAvatarDotHtml(author, 20, '0.68rem')} ${escapeHtml(author.name)}</span>
+              <button type="button" class="btn btn-outline btn-sm" data-delete-photo="${escapeHtml(p.id)}" aria-label="Supprimer photo">🗑️</button>
+            </div>
+          </article>
+        `;
+      }).join('');
 }
 
-// Rendu Onglet 5 : Discussion en direct
+// Rendu Onglet 5 : Activité en direct & relais WhatsApp
 function renderCarnetView() {
   if (!appState) return;
   const catBadges = {
-    info: 'ℹ️ Info',
-    sortie: `${BOAT_ICO} Sortie`,
-    materiel: '🔧 Matériel',
+    info: 'ℹ️ Doc / Info',
+    sortie: `${BOAT_ICO} Nav / Sortie`,
+    materiel: '🔧 Chantier / Courses',
     photo: '📸 Photo'
   };
 
@@ -2134,7 +2577,7 @@ function renderCarnetView() {
   });
 
   if (filtered.length === 0) {
-    $('#messages-list').innerHTML = '<div class="card"><p class="muted-text" style="margin:0">Aucun message dans cette vue pour le moment.</p></div>';
+    $('#messages-list').innerHTML = '<div class="card"><p class="muted-text" style="margin:0">Aucune activité dans cette vue pour le moment.</p></div>';
     return;
   }
 
@@ -2151,11 +2594,13 @@ function renderCarnetView() {
       return `<button type="button" class="react-btn ${active ? 'is-active' : ''}" data-react-msg="${escapeHtml(msg.id)}" data-emoji="${emoji}" title="${escapeHtml(titles || 'Réagir')}">${iconHtml}${voters.length ? ' ' + voters.length : ''}</button>`;
     }).join('');
 
+    const waText = `[Tombola] ${msg.text}\n👉 https://krieknini-hue.github.io/tombola/`;
+
     return `
       <article class="chat-bubble ${isMine ? 'is-mine' : 'is-other'} ${msg.pinned ? 'is-pinned' : ''}">
         <div class="chat-head">
           <div style="display:flex;align-items:center;gap:0.4rem;">
-            <span class="avatar-dot" style="background:${escapeHtml(m.color)};width:24px;height:24px;font-size:0.7rem">${escapeHtml(m.short)}</span>
+            ${renderAvatarDotHtml(m, 24, '0.7rem')}
             <strong>${escapeHtml(m.name)}</strong>
           </div>
           <span class="muted-text">${catBadges[msg.category] || 'ℹ️ Info'} • ${formatRelativeTime(msg.createdAt)}</span>
@@ -2165,6 +2610,7 @@ function renderCarnetView() {
         <div class="chat-reactions">
           ${reactButtons}
           <button type="button" class="react-btn ${msg.pinned ? 'is-active' : ''}" data-pin-msg="${escapeHtml(msg.id)}">${msg.pinned ? '📌 Épinglé' : '📌 Épingler'}</button>
+          <button type="button" class="react-btn" data-wa-msg="${escapeHtml(waText)}">📲 WhatsApp</button>
         </div>
       </article>
     `;
@@ -2336,6 +2782,29 @@ function compressImageFile(file) {
   });
 }
 
+function compressAvatarFile(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 120;
+        const side = Math.min(img.width, img.height);
+        const sx = Math.round((img.width - side) / 2);
+        const sy = Math.round((img.height - side) / 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Attachement de tous les événements
 function bindEvents() {
   // Navigation basse
@@ -2456,6 +2925,31 @@ function bindEvents() {
     renderAll();
     closeDialog('dialog-profile');
     showToast(`Bonjour ${getMember(currentMemberId).name} ! Votre prénom est mémorisé sur ce téléphone.`);
+  });
+
+  $('#member-avatar-input').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentMemberId) return;
+    try {
+      const avatarUrl = await compressAvatarFile(file);
+      await apiPost('/api/member/avatar', { memberId: currentMemberId, avatarUrl });
+      e.target.value = '';
+      renderMemberPicker();
+      showToast('Photo de profil mise à jour !');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  $('#btn-remove-avatar').addEventListener('click', async () => {
+    if (!currentMemberId) return;
+    try {
+      await apiPost('/api/member/avatar', { memberId: currentMemberId, avatarUrl: '' });
+      renderMemberPicker();
+      showToast('Photo de profil retirée.');
+    } catch (err) {
+      showToast(err.message, true);
+    }
   });
 
   // Statut Bateau
@@ -2661,6 +3155,25 @@ function bindEvents() {
       b.classList.toggle('is-active', b === btn);
     }
     renderPlanningView();
+  });
+
+  $('#form-priority-config').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    ensureMemberSelected(async (memberId) => {
+      try {
+        await apiPost('/api/priority-config', {
+          weekdayPerHour: Number($('#prio-weekday').value || 1),
+          weekendPerHour: Number($('#prio-weekend').value || 2.5),
+          openDiscount: Number($('#prio-open-discount').value || 0.5),
+          lastMinuteFree: $('#prio-last-minute').checked,
+          includeChantier: $('#prio-include-chantier').checked,
+          memberId
+        });
+        showToast('Règles de priorité mises à jour pour tout le collectif !');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
   });
 
   function syncMultiDayUi() {
@@ -2935,8 +3448,8 @@ function bindEvents() {
     }
   });
 
-  // Documents officiels (Supabase Storage privé : PDF signé + lecteur Markdown)
-  $('#doc-pane-official').addEventListener('click', async (e) => {
+  // Documents officiels (Supabase Storage privé : PDF signé + lecteur Markdown dans chaque dossier)
+  $('#view-charte').addEventListener('click', async (e) => {
     const docEl = e.target.closest('[data-storage-doc]');
     if (!docEl) return;
     const path = docEl.dataset.storageDoc;
@@ -2972,11 +3485,148 @@ function bindEvents() {
     }
   });
 
-  // Sous-onglets Journal / Charte / Frigo / Convention & Docs / Fiches
+  // Dossiers façon Drive
   $('#docs-subtabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-docstab]');
     if (!btn) return;
     switchDocsSubtab(btn.dataset.docstab);
+  });
+
+  // To-Do & Liste de courses
+  $('#todo-filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-todofilter]');
+    if (!btn) return;
+    activeTodoFilter = btn.dataset.todofilter;
+    for (const b of $$('#todo-filters .chip-filter')) {
+      b.classList.toggle('is-active', b === btn);
+    }
+    renderCharteView();
+  });
+
+  $('#btn-add-todo').addEventListener('click', () => {
+    ensureMemberSelected(() => {
+      $('#todo-title').value = '';
+      $('#todo-note').value = '';
+      $('#todo-kind-course').checked = true;
+      openDialog('dialog-todo');
+    });
+  });
+  $('#btn-todo-cancel').addEventListener('click', () => closeDialog('dialog-todo'));
+
+  $('#form-todo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await apiPost('/api/todos', {
+        action: 'add',
+        kind: document.querySelector('#form-todo input[name="kind"]:checked')?.value || 'course',
+        title: $('#todo-title').value,
+        note: $('#todo-note').value,
+        memberId: currentMemberId
+      });
+      closeDialog('dialog-todo');
+      showToast('Ajouté à la liste du collectif !');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  $('#todos-list').addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('[data-toggle-todo]');
+    if (toggleBtn) {
+      ensureMemberSelected(async (memberId) => {
+        try {
+          await apiPost('/api/todos', {
+            action: 'toggle',
+            todoId: toggleBtn.dataset.toggleTodo,
+            memberId
+          });
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+      return;
+    }
+    const delBtn = e.target.closest('[data-delete-todo]');
+    if (delBtn) {
+      ensureMemberSelected(() => {
+        $('#confirm-title').textContent = 'Retirer de la liste ?';
+        $('#confirm-message').textContent = 'Cet élément sera supprimé de la liste du collectif.';
+        pendingConfirmAction = async () => {
+          await apiPost('/api/todos', {
+            action: 'delete',
+            todoId: delBtn.dataset.deleteTodo,
+            memberId: currentMemberId
+          });
+          showToast('Élément retiré.');
+        };
+        openDialog('dialog-confirm');
+      });
+    }
+  });
+
+  // Album photo
+  $('#photo-filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-photofilter]');
+    if (!btn) return;
+    activePhotoFilter = btn.dataset.photofilter;
+    for (const b of $$('#photo-filters .chip-filter')) {
+      b.classList.toggle('is-active', b === btn);
+    }
+    renderCharteView();
+  });
+
+  $('#btn-add-album-photo').addEventListener('click', () => {
+    ensureMemberSelected(() => {
+      $('#album-photo-title').value = '';
+      $('#album-photo-date').value = toLocalIsoDate(new Date());
+      $('#album-photo-cat').value = 'navigation';
+      $('#album-photo-file').value = '';
+      pendingAlbumPhotoData = '';
+      openDialog('dialog-photo');
+    });
+  });
+  $('#btn-photo-cancel').addEventListener('click', () => closeDialog('dialog-photo'));
+
+  $('#album-photo-file').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    pendingAlbumPhotoData = file ? await compressImageFile(file) : '';
+  });
+
+  $('#form-album-photo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await apiPost('/api/photos', {
+        action: 'add',
+        title: $('#album-photo-title').value,
+        category: $('#album-photo-cat').value,
+        takenOn: $('#album-photo-date').value,
+        imageData: pendingAlbumPhotoData,
+        memberId: currentMemberId
+      });
+      pendingAlbumPhotoData = '';
+      closeDialog('dialog-photo');
+      showToast('Photo ajoutée à l\'album du collectif !');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  $('#photos-grid').addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-delete-photo]');
+    if (!delBtn) return;
+    ensureMemberSelected(() => {
+      $('#confirm-title').textContent = 'Supprimer cette photo ?';
+      $('#confirm-message').textContent = 'Elle sera retirée de l\'album photo du collectif.';
+      pendingConfirmAction = async () => {
+        await apiPost('/api/photos', {
+          action: 'delete',
+          photoId: delBtn.dataset.deletePhoto,
+          memberId: currentMemberId
+        });
+        showToast('Photo supprimée.');
+      };
+      openDialog('dialog-confirm');
+    });
   });
 
   // Journal de bord
@@ -3244,7 +3894,13 @@ function bindEvents() {
     }
   });
 
-  // Discussion en direct (filtres, messages rapides, réactions, épinglage, IME-safe Entrée)
+  // Activité en direct & relais WhatsApp
+  $('#btn-share-whatsapp-summary').addEventListener('click', () => {
+    const latest = (appState?.messages || []).slice(0, 5).map((m) => `• ${m.text}`).join('\n');
+    const summary = `⛵ *Activité Collectif Tombola*\n${latest || 'Nouvelles mises à jour sur l\'appli.'}\n\n👉 Ouvrir l'appli : https://krieknini-hue.github.io/tombola/`;
+    openWhatsAppShare(summary);
+  });
+
   $('#chat-filters').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-chatfilter]');
     if (!btn) return;
@@ -3256,20 +3912,9 @@ function bindEvents() {
   });
 
   $('#view-carnet').addEventListener('click', (e) => {
-    const quickBtn = e.target.closest('[data-quick-msg]');
-    if (quickBtn) {
-      ensureMemberSelected(async (memberId) => {
-        try {
-          await apiPost('/api/messages', {
-            category: quickBtn.dataset.quickCat || 'info',
-            text: quickBtn.dataset.quickMsg,
-            authorId: memberId
-          });
-          showToast('Message envoyé en direct !');
-        } catch (err) {
-          showToast(err.message, true);
-        }
-      });
+    const waBtn = e.target.closest('[data-wa-msg]');
+    if (waBtn) {
+      openWhatsAppShare(waBtn.dataset.waMsg);
       return;
     }
 

@@ -1548,3 +1548,165 @@ dialog::backdrop {
     display: none;
   }
 }
+
+/* Bandeau démo en construction */
+.demo-banner {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 5px solid var(--amber);
+  color: #78350f;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  margin-bottom: 0.85rem;
+}
+
+/* Grille des dossiers façon Drive */
+.drive-folders-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.drive-folder-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 72px;
+  padding: 0.5rem 0.35rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.drive-folder-btn .folder-ico {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.drive-folder-btn .folder-lbl {
+  line-height: 1.2;
+}
+
+.drive-folder-btn.is-active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+/* Avatars photo */
+.avatar-dot,
+.avatar-lg {
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 999px;
+}
+
+.avatar-upload-card {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+/* Liste de priorité pondérée */
+.priority-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.65rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.priority-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
+.priority-rank {
+  font-weight: 800;
+  color: var(--primary);
+  min-width: 1.75rem;
+}
+
+/* To-Do & Liste de courses */
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.85rem;
+}
+
+.todo-item.is-done {
+  opacity: 0.68;
+  background: #f8fafc;
+}
+
+.todo-item.is-done .todo-title {
+  text-decoration: line-through;
+}
+
+.todo-check-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 2px solid var(--primary);
+  background: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.todo-item.is-done .todo-check-btn {
+  background: var(--green);
+  border-color: var(--green);
+  color: #ffffff;
+}
+
+/* Album photo */
+.photo-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.photo-card {
+  padding: 0.7rem;
+}
+
+.photo-card img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  margin-bottom: 0.55rem;
+}

@@ -388,79 +388,93 @@
       </details>
     </section>
 
-    <!-- ONGLET 4 : JOURNAL DE BORD, CHARTE, FRIGO & DOCUMENTS COLLABORATIFS -->
+    <!-- ONGLET 4 : VIE QUOTIDIENNE (DOSSIERS FAÇON DRIVE) -->
     <section id="view-charte" class="tab-view" aria-labelledby="tab-btn-charte" hidden>
       <div class="guide-box" data-help-box>
-        <p><strong>💡 Journal de bord &amp; Espace collaboratif :</strong> racontez vos sorties, co-écrivez la <strong>Charte</strong> et la <strong>Convention</strong> (avec propositions nominatives façon Trello) ou consultez les fiches sécurité.</p>
+        <p><strong>💡 Vie quotidienne du collectif :</strong> chaque rubrique a son propre dossier (comme sur un Drive) : <strong>Journal de nav</strong> (100 % navigation), <strong>To-Do &amp; Courses</strong>, <strong>Convention</strong>, <strong>Charte</strong>, <strong>CR Réunions</strong>, <strong>Sécurité</strong>, <strong>Fiches techniques</strong>, <strong>Idées</strong> et <strong>Album photo</strong>.</p>
       </div>
 
-      <div class="filter-pills" id="docs-subtabs" role="tablist" aria-label="Sections du journal de bord">
-        <button type="button" class="chip-filter is-active" data-docstab="logbook">📓 Journal de bord</button>
-        <button type="button" class="chip-filter" data-docstab="charter">📜 Charte</button>
-        <button type="button" class="chip-filter" data-docstab="ideas">🧊 Frigo à idées</button>
-        <button type="button" class="chip-filter" data-docstab="official">📄 Convention &amp; Docs</button>
-        <button type="button" class="chip-filter" data-docstab="guides">🦺 Fiches bateau</button>
+      <div class="drive-folders-grid" id="docs-subtabs" role="tablist" aria-label="Dossiers de la vie quotidienne">
+        <button type="button" class="drive-folder-btn is-active" data-docstab="logbook">
+          <span class="folder-ico" aria-hidden="true">📓</span>
+          <span class="folder-lbl">Journal de nav</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="todos">
+          <span class="folder-ico" aria-hidden="true">🛒</span>
+          <span class="folder-lbl">To-Do &amp; Courses</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="convention">
+          <span class="folder-ico" aria-hidden="true">🤝</span>
+          <span class="folder-lbl">Convention</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="charter">
+          <span class="folder-ico" aria-hidden="true">📜</span>
+          <span class="folder-lbl">Charte</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="meetings">
+          <span class="folder-ico" aria-hidden="true">🗓️</span>
+          <span class="folder-lbl">CR Réunions</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="safety">
+          <span class="folder-ico" aria-hidden="true">🦺</span>
+          <span class="folder-lbl">Sécurité à bord</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="tech">
+          <span class="folder-ico" aria-hidden="true">⚙️</span>
+          <span class="folder-lbl">Fiches tech.</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="ideas">
+          <span class="folder-ico" aria-hidden="true">🧊</span>
+          <span class="folder-lbl">Frigo à idées</span>
+        </button>
+        <button type="button" class="drive-folder-btn" data-docstab="photos">
+          <span class="folder-ico" aria-hidden="true">📸</span>
+          <span class="folder-lbl">Album photo</span>
+        </button>
       </div>
 
-      <!-- SOUS-SECTION JOURNAL DE BORD -->
+      <!-- DOSSIER 1 : JOURNAL DE NAVIGATION (100 % NAV) -->
       <div id="doc-pane-logbook" class="doc-pane">
         <div class="inline-between">
-          <h2>📓 Journal de bord de Tombola</h2>
-          <button type="button" class="btn btn-primary" id="btn-add-logbook">+ Raconter une sortie / chantier</button>
+          <h2>📓 Journal de navigation</h2>
+          <button type="button" class="btn btn-primary" id="btn-add-logbook">+ Raconter une navigation</button>
         </div>
+        <p class="muted-text" style="margin-top:0">Uniquement dédié aux sorties sur l'eau (météo, comportement du bateau, bancs de sable, manœuvres).</p>
         <div id="logbook-list" class="cards-stack"></div>
       </div>
 
-      <!-- SOUS-SECTION CHARTE -->
-      <div id="doc-pane-charter" class="doc-pane" hidden>
+      <!-- DOSSIER 2 : TO-DO & LISTE DE COURSES -->
+      <div id="doc-pane-todos" class="doc-pane" hidden>
         <div class="inline-between">
-          <h2>📜 Notre Charte d'usage (co-écrite)</h2>
-          <button type="button" class="btn btn-primary" id="btn-add-charter">+ Nouvel article</button>
+          <h2>🛒 To-Do &amp; Liste de courses</h2>
+          <button type="button" class="btn btn-primary" id="btn-add-todo">+ Ajouter une course / tâche</button>
         </div>
-        <div id="charter-list" class="cards-stack"></div>
-      </div>
-
-      <!-- SOUS-SECTION FRIGO À IDÉES -->
-      <div id="doc-pane-ideas" class="doc-pane" hidden>
-        <div class="inline-between">
-          <h2>🧊 Le Frigo à idées de Tombola</h2>
-          <button type="button" class="btn btn-primary" id="btn-add-idea">💡 Poser une idée</button>
+        <div class="filter-pills" id="todo-filters" role="group" aria-label="Filtrer la liste">
+          <button type="button" class="chip-filter is-active" data-todofilter="open">À faire</button>
+          <button type="button" class="chip-filter" data-todofilter="all">Tout</button>
+          <button type="button" class="chip-filter" data-todofilter="course">🛒 Courses</button>
+          <button type="button" class="chip-filter" data-todofilter="tache">🛠️ Tâches</button>
         </div>
-        <div id="ideas-list" class="cards-stack"></div>
+        <div id="todos-list" class="cards-stack"></div>
       </div>
 
-      <!-- SOUS-SECTION FICHES TECHNIQUES -->
-      <div id="doc-pane-guides" class="doc-pane" hidden>
-        <h2>🦺 Fiches pratiques &amp; Sécurité à bord</h2>
-        <p class="muted-text">Touchez une fiche pour l'ouvrir. Vous pouvez aussi chercher un mot avec « Rechercher dans la page ».</p>
-        <div id="guides-list" class="cards-stack"></div>
-      </div>
-
-      <!-- SOUS-SECTION CONVENTION, CR & DOCUMENTS COLLABORATIFS (TYPE TRELLO) -->
-      <div id="doc-pane-official" class="doc-pane" hidden>
+      <!-- DOSSIER 3 : CONVENTION LA RABOUILLEUSE -->
+      <div id="doc-pane-convention" class="doc-pane" hidden>
         <div class="inline-between">
-          <h2>📄 Convention, CR &amp; Docs collaboratifs</h2>
+          <h2>🤝 Convention La Rabouilleuse</h2>
           <button type="button" class="btn btn-primary" id="btn-add-collab-doc">+ Nouveau document</button>
         </div>
-
         <div id="collab-docs-list" class="cards-stack"></div>
 
         <article class="card below-fold-section" style="margin-top:0.9rem;">
-          <h3>📥 Fichiers officiels de référence</h3>
+          <h3>📚 Trames &amp; bornage juridique associés</h3>
           <div class="cards-stack">
             <div class="doc-link-card">
               <div>
-                <strong>Compte-rendu de la réunion de cadrage (PDF)</strong>
-                <p class="muted-text">Réunion fondatrice de novembre 2026 à Rochecorbon (3 pages A4).</p>
+                <strong>Trame complète de Convention de co-usage (12 articles)</strong>
+                <p class="muted-text">Projet de convention associative avec annexes.</p>
               </div>
-              <a href="#" id="official-pdf-link" data-storage-doc="docs/Compte_Rendu_Tombolla_Rochecorbon.pdf" data-doc-title="Compte-rendu de la réunion de cadrage (PDF)" data-doc-type="pdf" target="_blank" rel="noopener" class="btn btn-primary">📥 Ouvrir le PDF</a>
-            </div>
-            <div class="doc-link-card">
-              <div>
-                <strong>Synthèse détaillée (format texte)</strong>
-                <p class="muted-text">Lecture rapide (~10 min) de toutes les décisions.</p>
-              </div>
-              <button type="button" data-storage-doc="docs/compte_rendu_tombolla.md" data-doc-title="Synthèse détaillée (Compte-rendu)" data-doc-type="md" class="btn btn-outline">📝 Lire</button>
+              <button type="button" data-storage-doc="docs/juridique/03_trame_convention_co_usage_rabouilleuse.md" data-doc-title="Trame de Convention de co-usage (12 articles)" data-doc-type="md" class="btn btn-outline">📜 Lire</button>
             </div>
             <div class="doc-link-card">
               <div>
@@ -472,88 +486,154 @@
             <div class="doc-link-card">
               <div>
                 <strong>Check-list CA La Rabouilleuse &amp; Assureur</strong>
-                <p class="muted-text">Questions à poser au CA, mail prêt pour l'assureur et check-list mise à l'eau.</p>
+                <p class="muted-text">Questions pour le CA, modèle de mail assureur et check-list mise à l'eau.</p>
               </div>
               <button type="button" data-storage-doc="docs/juridique/02_checklist_questions_CA_et_assureur.md" data-doc-title="Check-list CA La Rabouilleuse &amp; Assureur" data-doc-type="md" class="btn btn-outline">✅ Lire</button>
-            </div>
-            <div class="doc-link-card">
-              <div>
-                <strong>Trame complète de Convention de co-usage (12 articles)</strong>
-                <p class="muted-text">Projet complet de convention associative avec annexes.</p>
-              </div>
-              <button type="button" data-storage-doc="docs/juridique/03_trame_convention_co_usage_rabouilleuse.md" data-doc-title="Trame de Convention de co-usage (12 articles)" data-doc-type="md" class="btn btn-outline">📜 Lire</button>
-            </div>
-            <div class="doc-link-card">
-              <div>
-                <strong>Trame de Charte interne des 11 co-utilisateurs</strong>
-                <p class="muted-text">Version détaillée à co-construire ensemble.</p>
-              </div>
-              <button type="button" data-storage-doc="docs/juridique/04_trame_charte_interne_collectif.md" data-doc-title="Trame de Charte interne des 11 co-utilisateurs" data-doc-type="md" class="btn btn-outline">🤝 Lire</button>
             </div>
           </div>
         </article>
       </div>
-    </section>
 
-    <!-- ONGLET 5 : DISCUSSION EN DIRECT (REMPLACE WHATSAPP) -->
-    <section id="view-carnet" class="tab-view" aria-labelledby="tab-btn-carnet" hidden>
-      <div class="guide-box" data-help-box>
-        <p><strong>💡 Discussion en direct du collectif :</strong> échangez ici en temps réel comme sur WhatsApp, réagissez en 1 touche et <strong>épinglez (📌)</strong> les messages importants pour ne rien perdre !</p>
+      <!-- DOSSIER 4 : CHARTE INTERNE -->
+      <div id="doc-pane-charter" class="doc-pane" hidden>
+        <div class="inline-between">
+          <h2>📜 Charte d'usage du collectif</h2>
+          <button type="button" class="btn btn-primary" id="btn-add-charter">+ Nouvel article</button>
+        </div>
+        <div id="charter-list" class="cards-stack"></div>
+
+        <article class="card below-fold-section" style="margin-top:0.9rem;">
+          <div class="doc-link-card" style="padding:0;background:transparent;">
+            <div>
+              <strong>Trame détaillée de Charte interne (11 co-utilisateurs)</strong>
+              <p class="muted-text" style="margin-bottom:0">Document de travail détaillé à ajuster ensemble.</p>
+            </div>
+            <button type="button" data-storage-doc="docs/juridique/04_trame_charte_interne_collectif.md" data-doc-title="Trame de Charte interne des 11 co-utilisateurs" data-doc-type="md" class="btn btn-outline">🤝 Lire la trame</button>
+          </div>
+        </article>
       </div>
 
-      <div class="filter-pills" id="chat-filters" role="group" aria-label="Filtrer la discussion">
-        <button type="button" class="chip-filter is-active" data-chatfilter="all">💬 Tout le fil</button>
+      <!-- DOSSIER 5 : COMPTES-RENDUS DE RÉUNIONS -->
+      <div id="doc-pane-meetings" class="doc-pane" hidden>
+        <h2>🗓️ Comptes-rendus de réunions</h2>
+        <div class="cards-stack">
+          <article class="card">
+            <div class="card-head">
+              <span class="badge-soft">Novembre 2026</span>
+              <span class="badge-pill badge-open">8 présents</span>
+            </div>
+            <h3>Réunion fondatrice &amp; de cadrage (Rochecorbon)</h3>
+            <p class="muted-text">Synthèse des 5 thèmes validés : retours d'essais, 4 chantiers de carénage, essence, convention La Rabouilleuse et lancement de l'appli.</p>
+            <div class="inline-actions">
+              <a href="#" id="official-pdf-link" data-storage-doc="docs/Compte_Rendu_Tombolla_Rochecorbon.pdf" data-doc-title="Compte-rendu de la réunion de cadrage (PDF)" data-doc-type="pdf" target="_blank" rel="noopener" class="btn btn-primary">📥 Ouvrir le PDF (3 pages)</a>
+              <button type="button" data-storage-doc="docs/compte_rendu_tombolla.md" data-doc-title="Compte-rendu complet (Novembre 2026)" data-doc-type="md" class="btn btn-outline">📝 Lire le texte complet</button>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- DOSSIER 6 : SÉCURITÉ À BORD -->
+      <div id="doc-pane-safety" class="doc-pane" hidden>
+        <h2>🦺 Sécurité à bord &amp; Check-lists</h2>
+        <p class="muted-text">Armement obligatoire, consignes Loire et check-list complète avant de quitter le bateau.</p>
+        <div id="safety-guides-list" class="cards-stack"></div>
+      </div>
+
+      <!-- DOSSIER 7 : FICHES TECHNIQUES -->
+      <div id="doc-pane-tech" class="doc-pane" hidden>
+        <h2>⚙️ Fiches techniques bateau</h2>
+        <p class="muted-text">Mise en route moteur, durite de refroidissement, voile et affalage d'urgence.</p>
+        <div id="tech-guides-list" class="cards-stack"></div>
+      </div>
+
+      <!-- DOSSIER 8 : FRIGO À IDÉES -->
+      <div id="doc-pane-ideas" class="doc-pane" hidden>
+        <div class="inline-between">
+          <h2>🧊 Le Frigo à idées de Tombola</h2>
+          <button type="button" class="btn btn-primary" id="btn-add-idea">💡 Poser une idée</button>
+        </div>
+        <div id="ideas-list" class="cards-stack"></div>
+      </div>
+
+      <!-- DOSSIER 9 : ALBUM PHOTO -->
+      <div id="doc-pane-photos" class="doc-pane" hidden>
+        <div class="inline-between">
+          <h2>📸 Album photo du collectif</h2>
+          <button type="button" class="btn btn-primary" id="btn-add-album-photo">+ Ajouter une photo</button>
+        </div>
+        <div class="filter-pills" id="photo-filters" role="group" aria-label="Filtrer les photos">
+          <button type="button" class="chip-filter is-active" data-photofilter="all">Toutes</button>
+          <button type="button" class="chip-filter" data-photofilter="navigation">⛵ Navigation</button>
+          <button type="button" class="chip-filter" data-photofilter="chantier">🛠️ Chantier</button>
+          <button type="button" class="chip-filter" data-photofilter="collectif">🤝 Collectif</button>
+        </div>
+        <div id="photos-grid" class="photo-album-grid"></div>
+      </div>
+    </section>
+
+    <!-- ONGLET 5 : ACTIVITÉ EN DIRECT & RELAIS WHATSAPP -->
+    <section id="view-carnet" class="tab-view" aria-labelledby="tab-btn-carnet" hidden>
+      <div class="guide-box" data-help-box>
+        <p><strong>💡 Activité en direct :</strong> pour discuter tous les jours, on garde notre groupe <strong>WhatsApp</strong> ! Cet écran enregistre automatiquement chaque nouveauté dans l'appli (doc ajouté, sortie réservée, course cochée…) et vous permet de la relayer sur WhatsApp en 1 touche.</p>
+      </div>
+
+      <article class="card" style="padding:0.85rem;">
+        <div class="inline-between" style="margin-bottom:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.08rem;">🔔 Dernières activités sur l'appli</h2>
+            <p class="muted-text" style="margin:0.2rem 0 0;">Synchronisé en temps réel pour les 11 co-usagers.</p>
+          </div>
+          <button type="button" class="btn btn-green btn-sm" id="btn-share-whatsapp-summary">📲 Résumer sur WhatsApp</button>
+        </div>
+
+        <details class="mini-details" id="details-manual-announce">
+          <summary>📢 Publier une annonce manuelle (optionnel)</summary>
+          <form id="form-message" class="stack-form" style="margin-top:0.65rem;">
+            <fieldset class="radio-pills radio-pills-inline">
+              <legend>Catégorie</legend>
+              <div class="radio-row">
+                <input type="radio" id="msg-cat-info" name="category" value="info" checked>
+                <label for="msg-cat-info">ℹ️ Info / Doc</label>
+              </div>
+              <div class="radio-row">
+                <input type="radio" id="msg-cat-sortie" name="category" value="sortie">
+                <label for="msg-cat-sortie"><svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg> Sortie</label>
+              </div>
+              <div class="radio-row">
+                <input type="radio" id="msg-cat-materiel" name="category" value="materiel">
+                <label for="msg-cat-materiel">🔧 Chantier / Matériel</label>
+              </div>
+              <div class="radio-row">
+                <input type="radio" id="msg-cat-photo" name="category" value="photo">
+                <label for="msg-cat-photo">📸 Photo</label>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label for="msg-text">Annonce pour le fil d'activité <span aria-hidden="true">*</span></label>
+              <textarea id="msg-text" name="text" rows="2" required placeholder="Ex : Nouveau CR ajouté ou besoin de bras vendredi…"></textarea>
+            </div>
+
+            <div class="chat-composer-bottom">
+              <label for="msg-photo" class="btn btn-outline btn-sm photo-pick-lbl">
+                📷 Joindre photo
+                <input type="file" id="msg-photo" accept="image/*" class="visually-hidden">
+              </label>
+              <span id="msg-photo-status" class="hint"></span>
+              <button type="submit" class="btn btn-primary">➤ Publier</button>
+            </div>
+          </form>
+        </details>
+      </article>
+
+      <div class="filter-pills" id="chat-filters" role="group" aria-label="Filtrer l'activité">
+        <button type="button" class="chip-filter is-active" data-chatfilter="all">🔔 Tout</button>
         <button type="button" class="chip-filter" data-chatfilter="pinned">📌 Épinglés</button>
-        <button type="button" class="chip-filter" data-chatfilter="sortie"><svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg> Sorties</button>
-        <button type="button" class="chip-filter" data-chatfilter="materiel">🔧 Chantier / Matériel</button>
+        <button type="button" class="chip-filter" data-chatfilter="sortie"><svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg> Nav / Sorties</button>
+        <button type="button" class="chip-filter" data-chatfilter="materiel">🔧 Chantier / Courses</button>
       </div>
 
       <div id="pinned-messages-bar" class="pinned-bar" hidden></div>
-
-      <article class="card chat-composer-card">
-        <div class="quick-replies" aria-label="Messages rapides en un clic">
-          <button type="button" class="quick-reply-btn" data-quick-cat="sortie" data-quick-msg="Qui est partant pour naviguer bientôt ?"><svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg> Qui est partant ?</button>
-          <button type="button" class="quick-reply-btn" data-quick-cat="materiel" data-quick-msg="🛠️ Je passe au bateau aujourd'hui.">🛠️ Je passe au bateau</button>
-          <button type="button" class="quick-reply-btn" data-quick-cat="info" data-quick-msg="⚓ Tout est nickel et vérifié au Port du Pélio !">⚓ Tout est nickel au Pélio</button>
-        </div>
-
-        <form id="form-message" class="stack-form">
-          <fieldset class="radio-pills radio-pills-inline">
-            <legend>Sujet du message</legend>
-            <div class="radio-row">
-              <input type="radio" id="msg-cat-info" name="category" value="info" checked>
-              <label for="msg-cat-info">ℹ️ Info</label>
-            </div>
-            <div class="radio-row">
-              <input type="radio" id="msg-cat-sortie" name="category" value="sortie">
-              <label for="msg-cat-sortie"><svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg> Sortie</label>
-            </div>
-            <div class="radio-row">
-              <input type="radio" id="msg-cat-materiel" name="category" value="materiel">
-              <label for="msg-cat-materiel">🔧 Matériel</label>
-            </div>
-            <div class="radio-row">
-              <input type="radio" id="msg-cat-photo" name="category" value="photo">
-              <label for="msg-cat-photo">📸 Photo</label>
-            </div>
-          </fieldset>
-
-          <div class="field">
-            <label for="msg-text">Écrire au collectif <span aria-hidden="true">*</span></label>
-            <textarea id="msg-text" name="text" rows="2" required placeholder="Votre message en direct… (Entrée pour envoyer)"></textarea>
-          </div>
-
-          <div class="chat-composer-bottom">
-            <label for="msg-photo" class="btn btn-outline btn-sm photo-pick-lbl">
-              📷 Joindre photo
-              <input type="file" id="msg-photo" accept="image/*" class="visually-hidden">
-            </label>
-            <span id="msg-photo-status" class="hint"></span>
-            <button type="submit" class="btn btn-primary">➤ Envoyer</button>
-          </div>
-        </form>
-      </article>
-
       <div id="messages-list" class="chat-stream below-fold-section"></div>
     </section>
   </main>
@@ -580,16 +660,16 @@
       <span class="nav-lbl">Essence</span>
     </button>
     <button type="button" class="nav-btn" id="tab-btn-charte" data-tab="charte">
-      <span class="nav-ico" aria-hidden="true">📓</span>
-      <span class="nav-lbl">Journal</span>
+      <span class="nav-ico" aria-hidden="true">📂</span>
+      <span class="nav-lbl">Vie quot.</span>
     </button>
     <button type="button" class="nav-btn" id="tab-btn-carnet" data-tab="carnet">
-      <span class="nav-ico" aria-hidden="true">💬</span>
-      <span class="nav-lbl">Discussion</span>
+      <span class="nav-ico" aria-hidden="true">🔔</span>
+      <span class="nav-lbl">Activité</span>
     </button>
   </nav>
 
-  <!-- MODALE 1 : CHOIX DE PROFIL (11 MEMBRES) -->
+  <!-- MODALE 1 : CHOIX DE PROFIL & PHOTO DE PROFIL (11 MEMBRES) -->
   <dialog id="dialog-profile" closedby="any" aria-labelledby="profile-title">
     <div class="dialog-header">
       <h2 id="profile-title">👋 Première visite : choisissez votre prénom</h2>
@@ -609,6 +689,22 @@
         <button type="submit" class="btn btn-primary btn-lg btn-block" id="btn-unlock-collective">🔓 Déverrouiller l'accès collectif</button>
       </form>
       <div id="member-picker-wrap" hidden>
+        <div id="avatar-upload-box" class="avatar-upload-card" hidden>
+          <div style="display:flex;align-items:center;gap:0.65rem;">
+            <span class="avatar-lg" id="profile-avatar-preview">?</span>
+            <div>
+              <strong id="profile-avatar-name">Mon profil</strong>
+              <p class="hint" style="margin:0.1rem 0 0;">Ajoutez une petite photo pour que le groupe vous reconnaisse !</p>
+            </div>
+          </div>
+          <div class="inline-actions" style="margin-top:0.55rem;">
+            <label for="member-avatar-input" class="btn btn-outline btn-sm photo-pick-lbl">
+              📷 Choisir ma photo
+              <input type="file" id="member-avatar-input" accept="image/*" class="visually-hidden">
+            </label>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-remove-avatar" hidden>✕ Retirer photo</button>
+          </div>
+        </div>
         <div class="member-grid" id="member-picker-grid"></div>
       </div>
     </div>
@@ -626,22 +722,22 @@
       <div class="tour-step" data-tour-step="0">
         <div class="tour-emoji" aria-hidden="true"><svg class="tour-boat-ico" viewBox="0 0 48 44"><use href="#icon-loire-boat"></use></svg></div>
         <h3>1. Voyant « Vert / Bleu / Orange »</h3>
-        <p>Sur l'écran <strong>Bateau</strong>, vous voyez tout de suite si Tombola est amarré au Port du Pélio, sur l'eau ou en chantier. Quand vous partez naviguer, touchez simplement <strong>« Je pars sur l'eau »</strong> !</p>
+        <p>Sur l'écran <strong>Bateau</strong>, vous voyez tout de suite si Tombola est en chantier, amarré au Pélio ou sur l'eau. Quand vous partez naviguer, touchez <strong>« Je pars sur l'eau »</strong> !</p>
       </div>
       <div class="tour-step" data-tour-step="1" hidden>
         <div class="tour-emoji" aria-hidden="true">📅</div>
-        <h3>2. Réserver ou rejoindre une sortie</h3>
-        <p>Dans <strong>Planning</strong>, les sorties <strong>Ouvertes</strong> affichent combien de places il reste à bord. Touchez <strong>« ✋ Je monte à bord »</strong> pour venir, ou créez votre créneau (ouvert, famille, ou chantier).</p>
+        <h3>2. Planning &amp; Ordre de priorité</h3>
+        <p>Dans <strong>Planning</strong>, rejoignez un chantier ou une sortie en 1 touche, et consultez le classement de priorité pondéré selon la qualité des jours.</p>
       </div>
       <div class="tour-step" data-tour-step="2" hidden>
         <div class="tour-emoji" aria-hidden="true">⛽</div>
-        <h3>3. Peser l'essence sans prise de tête</h3>
-        <p>Dans <strong>Essence</strong>, tapez le poids de la nourrice au retour sur la petite balance : l'appli calcule les litres automatiquement. L'outil d'équité peut aussi être mis en pause en 1 clic.</p>
+        <h3>3. Peser l'essence au peson suspendu</h3>
+        <p>Dans <strong>Essence</strong>, accrochez la nourrice au peson à crochet et soulevez-la dans le vide : aucun besoin de sol plat, l'appli calcule et partage les litres automatiquement.</p>
       </div>
       <div class="tour-step" data-tour-step="3" hidden>
-        <div class="tour-emoji" aria-hidden="true">📓</div>
-        <h3>4. Journal de bord, Charte &amp; Docs</h3>
-        <p>Dans <strong>Journal</strong>, racontez vos sorties, co-éditez la Charte et la Convention (avec propositions nominatives façon Trello), ou consultez les fiches sécurité.</p>
+        <div class="tour-emoji" aria-hidden="true">📂</div>
+        <h3>4. Vie quotidienne façon Drive &amp; Activité</h3>
+        <p>Dans <strong>Vie quot.</strong>, chaque thème a son dossier (Journal de nav, Courses, Convention, Charte, CR, Sécurité, Album photo). L'onglet <strong>Activité</strong> trace tout et permet de relayer sur WhatsApp.</p>
       </div>
       <div class="tour-footer">
         <span class="tour-dots" id="tour-dots">Étape 1 / 4</span>
@@ -904,17 +1000,17 @@
     </form>
   </dialog>
 
-  <!-- MODALE 9 : AJOUTER AU JOURNAL DE BORD -->
+  <!-- MODALE 9 : AJOUTER AU JOURNAL DE NAVIGATION -->
   <dialog id="dialog-logbook" closedby="any" aria-labelledby="logbook-dialog-title">
     <div class="dialog-header">
-      <h2 id="logbook-dialog-title">📓 Ajouter au Journal de bord</h2>
+      <h2 id="logbook-dialog-title">📓 Raconter une navigation</h2>
       <form method="dialog">
         <button type="submit" class="dialog-close" value="cancel" aria-label="Fermer">✕</button>
       </form>
     </div>
     <form id="form-logbook" class="dialog-body stack-form">
       <div class="field">
-        <label for="log-title">Titre de la sortie ou du chantier <span aria-hidden="true">*</span></label>
+        <label for="log-title">Titre de la navigation <span aria-hidden="true">*</span></label>
         <input type="text" id="log-title" required placeholder="Ex : Belle remontée à la voile vers Montlouis">
       </div>
       <div class="form-row-2">
@@ -923,29 +1019,29 @@
           <input type="date" id="log-date" required>
         </div>
         <div class="field">
-          <label for="log-weather">Météo / Vent / Loire (facultatif)</label>
+          <label for="log-weather">Météo / Vent / Niveau Loire (facultatif)</label>
           <input type="text" id="log-weather" placeholder="Ex : Soleil, petit vent d'ouest">
         </div>
       </div>
       <fieldset class="field">
-        <legend>Équipage / Participants</legend>
+        <legend>Équipage à bord</legend>
         <div class="crew-picker" id="log-crew-picker"></div>
       </fieldset>
       <div class="field">
-        <label for="log-story">Récit &amp; souvenirs <span aria-hidden="true">*</span></label>
-        <textarea id="log-story" rows="3" required placeholder="Racontez votre sortie, les observations sur la Loire…"></textarea>
+        <label for="log-story">Récit de navigation <span aria-hidden="true">*</span></label>
+        <textarea id="log-story" rows="3" required placeholder="Racontez la sortie, le trajet, les manœuvres…"></textarea>
       </div>
       <div class="field">
-        <label for="log-notes">Notes techniques sur le bateau (facultatif)</label>
-        <textarea id="log-notes" rows="2" placeholder="Ex : Moteur OK, penser à vérifier tel bout…"></textarea>
+        <label for="log-notes">Infos techniques / bancs de sable / comportement bateau (facultatif)</label>
+        <textarea id="log-notes" rows="2" placeholder="Ex : Banc de sable devant Vouvray, moteur OK…"></textarea>
       </div>
       <div class="field">
-        <label for="log-photo">Photo souvenir (facultatif — allégée auto)</label>
+        <label for="log-photo">Photo de la sortie (facultatif — allégée auto)</label>
         <input type="file" id="log-photo" accept="image/*" class="file-input">
       </div>
       <div class="dialog-footer">
         <button type="button" class="btn btn-outline" id="btn-logbook-cancel">Annuler</button>
-        <button type="submit" class="btn btn-primary btn-lg">📓 Publier dans le journal</button>
+        <button type="submit" class="btn btn-primary btn-lg">📓 Publier dans le journal de nav</button>
       </div>
     </form>
   </dialog>
@@ -1015,7 +1111,7 @@
       <ol class="checklist-group" aria-label="Les 5 gestes de fin de sortie">
         <li class="checklist-item">1. Bateau bien amarré au Port du Pélio (double amarre si crue ou vent annoncé)</li>
         <li class="checklist-item">2. Écopé si besoin et caillebotis nettoyés (boue / sable)</li>
-        <li class="checklist-item">3. Évent de la nourrice fermé &amp; moteur coupé / relevé si besoin</li>
+        <li class="checklist-item">3. Évent de la nourrice fermé, peson à crochet utilisé dans le vide si besoin &amp; moteur coupé</li>
         <li class="checklist-item">4. Trappe moteur refermée avec le cadenas à code</li>
         <li class="checklist-item">5. Gilets, rames, bourde, bout de remorquage et écope rangés à bord</li>
       </ol>
@@ -1067,6 +1163,79 @@
         </form>
       </div>
     </div>
+  </dialog>
+
+  <!-- MODALE 15 : AJOUTER UNE COURSE / TÂCHE TO-DO -->
+  <dialog id="dialog-todo" closedby="any" aria-labelledby="todo-dialog-title">
+    <div class="dialog-header">
+      <h2 id="todo-dialog-title">🛒 Ajouter à la liste</h2>
+      <form method="dialog">
+        <button type="submit" class="dialog-close" value="cancel" aria-label="Fermer">✕</button>
+      </form>
+    </div>
+    <form id="form-todo" class="dialog-body stack-form">
+      <fieldset class="radio-pills radio-pills-inline">
+        <legend>Type</legend>
+        <div class="radio-row">
+          <input type="radio" id="todo-kind-course" name="kind" value="course" checked>
+          <label for="todo-kind-course">🛒 Achat / Course</label>
+        </div>
+        <div class="radio-row">
+          <input type="radio" id="todo-kind-tache" name="kind" value="tache">
+          <label for="todo-kind-tache">🛠️ Tâche To-Do</label>
+        </div>
+      </fieldset>
+      <div class="field">
+        <label for="todo-title">Intitulé <span aria-hidden="true">*</span></label>
+        <input type="text" id="todo-title" required placeholder="Ex : Pinceaux plats ou cordelette de rechange">
+      </div>
+      <div class="field">
+        <label for="todo-note">Précisions (facultatif)</label>
+        <input type="text" id="todo-note" placeholder="Ex : Taille, magasin ou qui peut s'en charger">
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-outline" id="btn-todo-cancel">Annuler</button>
+        <button type="submit" class="btn btn-primary btn-lg">✅ Ajouter à la liste</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODALE 16 : AJOUTER UNE PHOTO À L'ALBUM -->
+  <dialog id="dialog-photo" closedby="any" aria-labelledby="photo-dialog-title">
+    <div class="dialog-header">
+      <h2 id="photo-dialog-title">📸 Ajouter à l'album photo</h2>
+      <form method="dialog">
+        <button type="submit" class="dialog-close" value="cancel" aria-label="Fermer">✕</button>
+      </form>
+    </div>
+    <form id="form-album-photo" class="dialog-body stack-form">
+      <div class="field">
+        <label for="album-photo-title">Légende / titre court <span aria-hidden="true">*</span></label>
+        <input type="text" id="album-photo-title" required placeholder="Ex : Coucher de soleil au Pélio">
+      </div>
+      <div class="form-row-2">
+        <div class="field">
+          <label for="album-photo-cat">Dossier</label>
+          <select id="album-photo-cat">
+            <option value="navigation">⛵ Navigation</option>
+            <option value="chantier">🛠️ Chantier</option>
+            <option value="collectif">🤝 Collectif</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="album-photo-date">Date</label>
+          <input type="date" id="album-photo-date" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="album-photo-file">Choisir une photo <span aria-hidden="true">*</span></label>
+        <input type="file" id="album-photo-file" accept="image/*" class="file-input" required>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-outline" id="btn-photo-cancel">Annuler</button>
+        <button type="submit" class="btn btn-primary btn-lg">📸 Publier dans l'album</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js" defer></script>
