@@ -1587,7 +1587,6 @@ dialog::backdrop {
   text-align: center;
   cursor: pointer;
   box-shadow: var(--shadow);
-  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .drive-folder-btn .folder-ico {
