@@ -59,6 +59,9 @@
   </header>
 
   <main id="app-main" class="app-main">
+    <div class="demo-banner" role="note">
+      🚧 <strong>Version démo en construction</strong> — Données remises à zéro (seuls nos 4 chantiers, 3 navigations réelles et la liste d'achats sont enregistrés).
+    </div>
     <div id="toast-banner" class="toast-banner" role="status" aria-live="polite" hidden></div>
 
     <!-- ONGLET 1 : BATEAU & TEMPS RÉEL -->
@@ -286,19 +289,67 @@
         </div>
         <div id="planning-day-detail" class="cards-stack"></div>
       </div>
+
+      <!-- ORDRE DE PRIORITÉ & RÈGLES D'ÉQUITÉ -->
+      <details class="card collapsible-card below-fold-section" id="details-priority-order" style="margin-top:0.85rem;">
+        <summary class="collapsible-summary">
+          <span><strong>⚖️ Ordre de priorité &amp; Règles d'équité</strong> (en test)</span>
+          <span class="badge-soft">Voir / Régler</span>
+        </summary>
+        <div class="collapsible-body">
+          <div class="equity-banner">
+            Classement des 11 co-usagers selon l'aspect qualitatif des jours consommés. Le <strong>n°1</strong> a la priorité sur les créneaux demandés (ex. week-end).
+          </div>
+          <ol id="priority-order-list" class="priority-list"></ol>
+
+          <details class="mini-details" style="margin-top:0.75rem;">
+            <summary>⚙️ Régler les règles et unités de mesure</summary>
+            <form id="form-priority-config" class="stack-form" style="margin-top:0.65rem;">
+              <div class="form-row-2">
+                <div class="field">
+                  <label for="prio-weekday">Unités / heure en semaine</label>
+                  <input type="number" step="0.5" min="0" max="10" id="prio-weekday" value="1">
+                </div>
+                <div class="field">
+                  <label for="prio-weekend">Unités / heure week-end &amp; férié</label>
+                  <input type="number" step="0.5" min="0" max="10" id="prio-weekend" value="2.5">
+                </div>
+              </div>
+              <div class="field">
+                <label for="prio-open-discount">Ristourne si sortie ouverte au collectif</label>
+                <select id="prio-open-discount">
+                  <option value="0">Aucune réduction (0 %)</option>
+                  <option value="0.25">-25 % sur les unités</option>
+                  <option value="0.5" selected>-50 % sur les unités</option>
+                  <option value="0.75">-75 % sur les unités</option>
+                </select>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="prio-last-minute" checked>
+                <label for="prio-last-minute">Dernière minute (&lt; 24h) gratuite (0 unité)</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="prio-include-chantier">
+                <label for="prio-include-chantier">Donner un bonus chantier (-0.5 u/h de travaux)</label>
+              </div>
+              <button type="submit" class="btn btn-primary">💾 Enregistrer les règles pour le collectif</button>
+            </form>
+          </details>
+        </div>
+      </details>
     </section>
 
-    <!-- ONGLET 3 : ESSENCE & ÉQUITÉ -->
+    <!-- ONGLET 3 : ESSENCE & PESON -->
     <section id="view-essence" class="tab-view" aria-labelledby="tab-btn-essence" hidden>
       <div class="guide-box" data-help-box>
-        <p><strong>💡 Pour l'essence, c'est tout simple :</strong> posez la nourrice sur la petite balance du bateau avant et après la balade, tapez les deux poids ci-dessous, et l'appli calcule les litres pour vous.</p>
+        <p><strong>💡 Astuce du peson suspendu :</strong> accrochez simplement la nourrice au <strong>peson électronique à crochet</strong> et soulevez-la dans le vide au départ et au retour (aucun besoin de la sortir ni d'avoir un sol plat !).</p>
       </div>
 
       <!-- CARBURANT -->
       <article class="card">
         <div class="card-head">
-          <h2>⛽ Nourrice &amp; Balance d'essence</h2>
-          <span class="badge-soft" id="fuel-mode-badge">Option Balance</span>
+          <h2>⛽ Nourrice &amp; Peson d'essence</h2>
+          <span class="badge-soft" id="fuel-mode-badge">Option 1 : Peson</span>
         </div>
 
         <div class="fuel-gauge-box">
@@ -316,12 +367,12 @@
         </div>
 
         <div class="mode-switch-row" role="group" aria-label="Choisir la méthode carburant en test">
-          <button type="button" class="chip-filter is-active" id="btn-mode-scale">⚖️ Option 1 : Pesée balance</button>
+          <button type="button" class="chip-filter is-active" id="btn-mode-scale">🪝 Option 1 : Peson à crochet</button>
           <button type="button" class="chip-filter" id="btn-mode-mark">⛽ Option 2 : Complément au repère</button>
         </div>
 
         <p class="muted-text" id="fuel-mode-desc">
-          En mode Balance : pesez la nourrice au départ et au retour (densité essence 0,75 kg/L).
+          En mode Peson : accrochez et soulevez la nourrice dans le vide au départ et au retour (densité essence 0,75 kg/L).
         </p>
 
         <form id="form-fuel-weigh" class="stack-form" novalidate>
@@ -345,7 +396,7 @@
             <div class="field">
               <label for="fuel-end-kg">Poids au retour (kg) <span aria-hidden="true">*</span></label>
               <input type="text" inputmode="decimal" id="fuel-end-kg" name="endKg" required pattern="^\d+([.,]\d{1,2})?$" placeholder="ex: 8.1" aria-describedby="fuel-end-help">
-              <span id="fuel-end-help" class="hint">Saisissez le chiffre lu sur la balance.</span>
+              <span id="fuel-end-help" class="hint">Saisissez le chiffre lu sur le peson suspendu.</span>
             </div>
           </div>
 

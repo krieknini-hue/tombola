@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tombola-shell-v18';
+const CACHE_NAME = 'tombola-shell-v19';
 const SHELL_FILES = [
   './',
   './index.html',
