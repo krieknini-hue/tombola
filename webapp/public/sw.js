@@ -1,16 +1,18 @@
-const CACHE_NAME = 'tombola-shell-v21';
+const CACHE_NAME = 'tombola-shell-v22';
 const SHELL_FILES = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
+  './styles.css?v=22',
+  './app.js?v=22',
   './manifest.json',
   './icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(SHELL_FILES.map((file) => cache.add(new Request(file, { cache: 'reload' }))))
+    )
   );
   self.skipWaiting();
 });
@@ -32,8 +34,11 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/docs/')) {
     return;
   }
+  const fetchPromise = event.request.method === 'GET'
+    ? fetch(event.request, { cache: 'no-cache' })
+    : fetch(event.request);
   event.respondWith(
-    fetch(event.request)
+    fetchPromise
       .then((res) => {
         if (event.request.method === 'GET' && res.ok) {
           const copy = res.clone();

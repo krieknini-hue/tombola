@@ -1891,10 +1891,18 @@ async function fetchOpenMeteoForecast(useMeteoFrance) {
   if (useMeteoFrance) {
     params.set('models', 'meteofrance_seamless');
   }
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  return parseOpenMeteoPayload(data);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return parseOpenMeteoPayload(data);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadWeather(force = false) {
@@ -4396,7 +4404,7 @@ async function init() {
   loadWeather(false);
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
   }
 
   sbClient.auth.onAuthStateChange((_event, session) => {
