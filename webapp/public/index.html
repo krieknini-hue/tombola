@@ -21,6 +21,9 @@
         <line x1="-11.5" y1="-17" x2="13.5" y2="-17" stroke="#fde68a" stroke-width="1.3"/>
       </g>
     </symbol>
+    <symbol id="icon-wind-arrow" viewBox="0 0 24 24">
+      <path d="M12 2.5L18.5 19.5L12 15.8L5.5 19.5L12 2.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+    </symbol>
   </svg>
 
   <header class="top-bar">
@@ -95,6 +98,24 @@
           <button type="button" class="btn btn-secondary btn-lg" id="btn-update-live-pos" hidden>
             📍 Mettre à jour notre position
           </button>
+        </div>
+      </article>
+
+      <!-- MÉTÉO 2H (TOUTES LES 30 MIN) -->
+      <article class="card weather-card" id="weather-card" aria-live="polite">
+        <header class="weather-head">
+          <div class="weather-title-group">
+            <h2>🌤️ Météo Pélio</h2>
+            <span class="weather-pill" id="weather-rain-pill">⏳ …</span>
+            <span class="weather-pill is-wind-warn" id="weather-wind-pill" hidden></span>
+          </div>
+          <div class="weather-meta">
+            <span class="weather-updated" id="weather-updated"></span>
+            <button type="button" class="weather-refresh-btn" id="btn-refresh-weather" aria-label="Actualiser la météo" title="Actualiser la météo">🔄</button>
+          </div>
+        </header>
+        <div class="weather-grid" id="weather-slots" role="list" aria-label="Prévisions météo toutes les 30 minutes sur 2 heures">
+          <div class="weather-loading">Chargement météo…</div>
         </div>
       </article>
 
@@ -530,7 +551,7 @@
             <div class="doc-link-card">
               <div>
                 <strong>Bornage juridique &amp; réglementaire (Loire / La Rabouilleuse)</strong>
-                <p class="muted-text">Co-usage associatif, fiscalité, carte de circulation, sécurité 37 et assurances.</p>
+                <p class="muted-text">Co-usage associatif, fiscalité/TVA, carte de circulation, sécurité 37 et assurances.</p>
               </div>
               <button type="button" data-storage-doc="docs/juridique/01_bornage_juridique_et_reglementaire.md" data-doc-title="Bornage juridique &amp; réglementaire" data-doc-type="md" class="btn btn-outline">⚖️ Lire</button>
             </div>

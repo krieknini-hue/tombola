@@ -1709,3 +1709,253 @@ dialog::backdrop {
   display: block;
   margin-bottom: 0.55rem;
 }
+
+/* Météo 2h (écran d'accueil) */
+.weather-card {
+  container-type: inline-size;
+  padding: 0.85rem 0.9rem;
+}
+
+.weather-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.weather-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.weather-title-group h2 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+
+.weather-pill {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.weather-pill.is-dry {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.weather-pill.is-rain-soon {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.weather-pill.is-rain {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.weather-pill.is-wind-warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.weather-pill.is-wind-danger {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.weather-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.weather-updated {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.weather-refresh-btn {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease;
+}
+
+.weather-refresh-btn:disabled,
+.weather-refresh-btn.is-loading {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+@container (max-width: 419px) {
+  .weather-grid {
+    grid-template-columns: repeat(5, minmax(72px, 1fr));
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 0.2rem;
+  }
+}
+
+.weather-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0.65rem 0;
+}
+
+.weather-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.55rem 0.3rem;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  border: 1.5px solid transparent;
+  text-align: center;
+  scroll-snap-align: start;
+}
+
+.weather-slot.is-now {
+  background: var(--primary-soft);
+  border-color: #99d3da;
+}
+
+.weather-slot.is-rain {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.weather-slot.is-wind-warn {
+  border-color: #f59e0b;
+}
+
+.weather-slot.is-wind-danger {
+  border-color: #ef4444;
+}
+
+.w-time {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.weather-slot.is-now .w-time {
+  color: var(--primary);
+}
+
+.w-ico {
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.w-temp {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.w-wind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  margin-top: 0.15rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(28, 37, 44, 0.08);
+  width: 100%;
+}
+
+.w-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.w-dir.is-mod {
+  color: var(--amber);
+}
+
+.w-dir.is-strong {
+  color: var(--red);
+}
+
+.wind-arrow-svg {
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.w-speed {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.w-gust {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  min-height: 1.05em;
+}
+
+.w-gust.is-mod {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.w-gust.is-strong {
+  color: var(--red);
+  font-weight: 800;
+}
+
+.w-rain {
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.08rem 0.4rem;
+}
+
+.w-rain.is-wet {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.w-rain.is-dry {
+  color: #64748b;
+  font-weight: 600;
+}

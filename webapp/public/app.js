@@ -8,6 +8,9 @@ const STORAGE_MEMBER_KEY = 'tombola_member_id';
 const STORAGE_HELP_KEY = 'tombola_help_enabled';
 const STORAGE_TOUR_DONE = 'tombola_tour_done';
 const STORAGE_AUTO_GPS_KEY = 'tombola_auto_gps';
+const STORAGE_WEATHER_CACHE_KEY = 'tombola_weather_cache_v1';
+const WEATHER_REFRESH_MS = 10 * 60 * 1000;
+const WEATHER_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 const BOAT_ICO = '<svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg>';
 
 const MEMBER_ORDER = [
@@ -131,6 +134,9 @@ let helpEnabled = localStorage.getItem(STORAGE_HELP_KEY) !== 'false';
 let autoGpsEnabled = localStorage.getItem(STORAGE_AUTO_GPS_KEY) === 'true';
 let gpsWatchId = null;
 let lastAutoGpsSentAt = 0;
+let weatherState = null;
+let weatherLastFetchAt = 0;
+let weatherFetchInFlight = false;
 let tourStep = 0;
 let pendingConfirmAction = null;
 let selectedCrewSet = new Set();
@@ -1646,6 +1652,303 @@ function findActiveScheduledChantier() {
   }) || null;
 }
 
+function isWetWeatherCode(code) {
+  const c = Number(code);
+  return (c >= 51 && c <= 67) || (c >= 71 && c <= 77) || (c >= 80 && c <= 86) || c >= 95;
+}
+
+function getWeatherEmoji(code, isDay = 1, precipMm = 0) {
+  const c = Number(code);
+  const day = Number(isDay) !== 0;
+  if (Number(precipMm) >= 0.1 && c <= 3) {
+    return Number(precipMm) >= 0.5 ? '🌧️' : '🌦️';
+  }
+  if (c === 0) return day ? '☀️' : '🌙';
+  if (c === 1) return day ? '🌤️' : '🌙';
+  if (c === 2) return '⛅';
+  if (c === 3) return '☁️';
+  if (c === 45 || c === 48) return '🌫️';
+  if (c >= 51 && c <= 57) return '🌦️';
+  if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return '🌧️';
+  if ((c >= 71 && c <= 77) || (c >= 85 && c <= 86)) return '🌨️';
+  if (c >= 95) return '⛈️';
+  return '🌤️';
+}
+
+function getWindCardinalFr(deg) {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+  const norm = ((Number(deg || 0) % 360) + 360) % 360;
+  return dirs[Math.round(norm / 45) % 8];
+}
+
+function formatClockHm(isoLocalStr) {
+  const hhmm = String(isoLocalStr || '').slice(11, 16);
+  return hhmm ? hhmm.replace(':', 'h') : '';
+}
+
+function formatMmFr(mm) {
+  const val = Number(mm || 0);
+  if (val > 0 && val < 0.1) return '<0,1';
+  return val.toFixed(1).replace('.', ',');
+}
+
+function parseOpenMeteoPayload(data) {
+  const current = data?.current;
+  const m15 = data?.minutely_15;
+  if (!current || !Array.isArray(m15?.time) || m15.time.length === 0) {
+    throw new Error('Données météo incomplètes');
+  }
+
+  let startIdx = m15.time.indexOf(current.time);
+  if (startIdx < 0) startIdx = 0;
+
+  const slots = [];
+  for (let step = 0; step <= 4; step++) {
+    const idx = startIdx + step * 2;
+    if (idx >= m15.time.length) break;
+
+    if (step === 0) {
+      const precip = Math.max(Number(current.precipitation || 0), Number(m15.precipitation?.[idx] || 0));
+      slots.push({
+        isNow: true,
+        label: 'Maint.',
+        temp: Number(current.temperature_2m ?? m15.temperature_2m?.[idx] ?? 0),
+        windSpeed: Number(current.wind_speed_10m ?? m15.wind_speed_10m?.[idx] ?? 0),
+        windGusts: Number(current.wind_gusts_10m ?? m15.wind_gusts_10m?.[idx] ?? 0),
+        windDir: Number(current.wind_direction_10m ?? m15.wind_direction_10m?.[idx] ?? 0),
+        precip,
+        weatherCode: Number(current.weather_code ?? m15.weather_code?.[idx] ?? 0),
+        isDay: Number(current.is_day ?? m15.is_day?.[idx] ?? 1)
+      });
+    } else {
+      const prevIdx = Math.max(startIdx, idx - 1);
+      const precip = Number(m15.precipitation?.[prevIdx] || 0) + Number(m15.precipitation?.[idx] || 0);
+      const gusts = Math.max(
+        Number(m15.wind_gusts_10m?.[prevIdx] || 0),
+        Number(m15.wind_gusts_10m?.[idx] || 0)
+      );
+      const c1 = Number(m15.weather_code?.[prevIdx] ?? 0);
+      const c2 = Number(m15.weather_code?.[idx] ?? 0);
+      const weatherCode = (isWetWeatherCode(c1) || isWetWeatherCode(c2)) ? Math.max(c1, c2) : c2;
+
+      slots.push({
+        isNow: false,
+        label: formatClockHm(m15.time[idx]),
+        temp: Number(m15.temperature_2m?.[idx] ?? 0),
+        windSpeed: Number(m15.wind_speed_10m?.[idx] ?? 0),
+        windGusts: gusts,
+        windDir: Number(m15.wind_direction_10m?.[idx] ?? 0),
+        precip,
+        weatherCode,
+        isDay: Number(m15.is_day?.[idx] ?? 1)
+      });
+    }
+  }
+
+  const endWindowIdx = Math.min(m15.time.length - 1, startIdx + 8);
+  const isSlotWetAt = (i) => Number(m15.precipitation?.[i] || 0) >= 0.1 || isWetWeatherCode(m15.weather_code?.[i]);
+  const nowWet = slots[0] ? (slots[0].precip >= 0.1 || isWetWeatherCode(slots[0].weatherCode)) : false;
+
+  let rainSummary;
+  if (nowWet) {
+    let dryFromIdx = -1;
+    for (let i = startIdx + 1; i <= endWindowIdx; i++) {
+      if (!isSlotWetAt(i)) {
+        let staysDry = true;
+        for (let j = i; j <= endWindowIdx; j++) {
+          if (isSlotWetAt(j)) {
+            staysDry = false;
+            break;
+          }
+        }
+        if (staysDry) {
+          dryFromIdx = i;
+          break;
+        }
+      }
+    }
+    rainSummary = {
+      kind: 'rain',
+      text: dryFromIdx >= 0
+        ? `🌧️ Pluie → fin ~${formatClockHm(m15.time[dryFromIdx])}`
+        : '🌧️ Pluie en cours'
+    };
+  } else {
+    let firstWetIdx = -1;
+    for (let i = startIdx + 1; i <= endWindowIdx; i++) {
+      if (isSlotWetAt(i)) {
+        firstWetIdx = i;
+        break;
+      }
+    }
+    rainSummary = firstWetIdx >= 0
+      ? { kind: 'rain-soon', text: `🌦️ Pluie ~${formatClockHm(m15.time[firstWetIdx])}` }
+      : { kind: 'dry', text: `${Number(slots[0]?.isDay) !== 0 ? '☀️' : '🌙'} Sec (2h)` };
+  }
+
+  const maxWind = Math.max(0, ...slots.map((s) => s.windSpeed));
+  const maxGusts = Math.max(0, ...slots.map((s) => s.windGusts));
+
+  return {
+    fetchedAt: Date.now(),
+    updatedClock: formatClockHm(current.time),
+    slots,
+    rainSummary,
+    maxWind,
+    maxGusts
+  };
+}
+
+function renderWeatherCard(isOffline = false) {
+  const slotsEl = $('#weather-slots');
+  const rainPill = $('#weather-rain-pill');
+  const windPill = $('#weather-wind-pill');
+  const updatedEl = $('#weather-updated');
+  if (!slotsEl || !rainPill || !windPill || !updatedEl) return;
+
+  if (!weatherState || !Array.isArray(weatherState.slots) || weatherState.slots.length === 0) {
+    rainPill.className = 'weather-pill';
+    rainPill.textContent = isOffline ? '📡 Hors-ligne' : '⏳ …';
+    windPill.hidden = true;
+    updatedEl.textContent = '';
+    slotsEl.innerHTML = `<div class="weather-loading">${
+      isOffline ? '📡 Météo indisponible (hors-ligne)' : 'Chargement météo…'
+    }</div>`;
+    return;
+  }
+
+  const { slots, rainSummary, updatedClock, maxWind, maxGusts } = weatherState;
+  rainPill.className = `weather-pill is-${rainSummary.kind}`;
+  rainPill.textContent = rainSummary.text;
+
+  if (maxGusts >= 50) {
+    windPill.hidden = false;
+    windPill.className = 'weather-pill is-wind-danger';
+    windPill.textContent = `💨 Raf. ${Math.round(maxGusts)} km/h`;
+  } else if (maxGusts >= 35 || maxWind >= 25) {
+    windPill.hidden = false;
+    windPill.className = 'weather-pill is-wind-warn';
+    windPill.textContent = `💨 Vent ${Math.round(Math.max(maxWind, maxGusts))} km/h`;
+  } else {
+    windPill.hidden = true;
+  }
+
+  updatedEl.textContent = updatedClock ? `${updatedClock}${isOffline ? ' (hors-ligne)' : ''}` : '';
+
+  slotsEl.innerHTML = slots.map((s) => {
+    const speed = Math.round(s.windSpeed);
+    const gusts = Math.round(s.windGusts);
+    const hasGust = gusts > speed + 2;
+    const isWet = s.precip >= 0.1 || isWetWeatherCode(s.weatherCode);
+    const card = getWindCardinalFr(s.windDir);
+    const arrowDeg = (Math.round(s.windDir) + 180) % 360;
+    const ico = getWeatherEmoji(s.weatherCode, s.isDay, s.precip);
+    const windLevel = gusts >= 50 || speed >= 35 ? 'is-strong' : (gusts >= 35 || speed >= 25 ? 'is-mod' : '');
+
+    const slotClasses = ['weather-slot'];
+    if (s.isNow) slotClasses.push('is-now');
+    else if (isWet) slotClasses.push('is-rain');
+    if (windLevel === 'is-strong') slotClasses.push('is-wind-danger');
+    else if (windLevel === 'is-mod') slotClasses.push('is-wind-warn');
+
+    const rainTxt = s.precip >= 0.1
+      ? `💧 ${formatMmFr(s.precip)} mm`
+      : (isWet ? '💧 Pluie' : '—');
+    const aria = `${s.isNow ? 'Maintenant' : s.label}, ${Math.round(s.temp)} degrés, vent ${card} ${speed} km/h${
+      hasGust ? `, rafales ${gusts} km/h` : ''
+    }, ${isWet ? `pluie ${formatMmFr(s.precip)} mm` : 'pas de pluie'}`;
+
+    return `
+      <div class="${slotClasses.join(' ')}" role="listitem" aria-label="${escapeHtml(aria)}">
+        <span class="w-time">${escapeHtml(s.label)}</span>
+        <span class="w-ico" aria-hidden="true">${ico}</span>
+        <span class="w-temp">${Math.round(s.temp)}°</span>
+        <div class="w-wind">
+          <span class="w-dir ${windLevel}" title="Vent venant de ${card} (${Math.round(s.windDir)}°)">
+            <svg class="wind-arrow-svg" aria-hidden="true" style="transform: rotate(${arrowDeg}deg)"><use href="#icon-wind-arrow"></use></svg>
+            <span>${card}</span>
+          </span>
+          <span class="w-speed">${speed} km/h</span>
+          <span class="w-gust ${windLevel}">${hasGust ? `raf. ${gusts}` : '&nbsp;'}</span>
+        </div>
+        <span class="w-rain ${isWet ? 'is-wet' : 'is-dry'}">${rainTxt}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+async function fetchOpenMeteoForecast(useMeteoFrance) {
+  const pelio = LOIRE_SPOTS.find((s) => s.id === 'pelio') || { lat: 47.4065, lng: 0.7552 };
+  const params = new URLSearchParams({
+    latitude: String(pelio.lat),
+    longitude: String(pelio.lng),
+    current: 'temperature_2m,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    minutely_15: 'temperature_2m,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    wind_speed_unit: 'kmh',
+    timezone: 'Europe/Paris',
+    forecast_minutely_15: '12'
+  });
+  if (useMeteoFrance) {
+    params.set('models', 'meteofrance_seamless');
+  }
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return parseOpenMeteoPayload(data);
+}
+
+async function loadWeather(force = false) {
+  if (!weatherState) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(STORAGE_WEATHER_CACHE_KEY) || 'null');
+      if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt < WEATHER_CACHE_MAX_AGE_MS) {
+        weatherState = cached;
+        weatherLastFetchAt = cached.fetchedAt;
+        renderWeatherCard(false);
+      }
+    } catch {
+      // ignorer cache corrompu
+    }
+  }
+
+  if (weatherFetchInFlight) return;
+  if (!force && weatherLastFetchAt && Date.now() - weatherLastFetchAt < WEATHER_REFRESH_MS) {
+    return;
+  }
+
+  weatherFetchInFlight = true;
+  const refreshBtn = $('#btn-refresh-weather');
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add('is-loading');
+  }
+
+  try {
+    let parsed;
+    try {
+      parsed = await fetchOpenMeteoForecast(true);
+    } catch {
+      parsed = await fetchOpenMeteoForecast(false);
+    }
+    weatherState = parsed;
+    weatherLastFetchAt = parsed.fetchedAt;
+    try {
+      localStorage.setItem(STORAGE_WEATHER_CACHE_KEY, JSON.stringify(parsed));
+    } catch {
+      // ignorer quota localStorage
+    }
+    renderWeatherCard(false);
+  } catch {
+    renderWeatherCard(true);
+  } finally {
+    weatherFetchInFlight = false;
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove('is-loading');
+    }
+  }
+}
+
 function renderBoatView() {
   if (!appState) return;
   const st = appState.boatStatus;
@@ -3069,6 +3372,10 @@ function bindEvents() {
     });
   });
 
+  $('#btn-refresh-weather')?.addEventListener('click', () => {
+    loadWeather(true);
+  });
+
   // Écopage
   $('#btn-ecopage-done').addEventListener('click', () => {
     ensureMemberSelected(() => {
@@ -4086,6 +4393,7 @@ async function init() {
   setupDialogFallbacks();
   applyHelpVisibility();
   bindEvents();
+  loadWeather(false);
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -4099,10 +4407,17 @@ async function init() {
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && hasActiveAuthSession()) {
-      scheduleReload();
+    if (document.visibilityState === 'visible') {
+      loadWeather(false);
+      if (hasActiveAuthSession()) scheduleReload();
     }
   });
+
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadWeather(false);
+    }
+  }, WEATHER_REFRESH_MS);
 
   try {
     const loaded = await loadAllState();
