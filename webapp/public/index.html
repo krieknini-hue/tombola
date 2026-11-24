@@ -7,7 +7,7 @@
   <title>Tombola — Collectif Loire &amp; Toue</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=22">
+  <link rel="stylesheet" href="./styles.css?v=23">
 </head>
 <body>
   <svg class="visually-hidden" aria-hidden="true">
@@ -106,6 +106,7 @@
         <header class="weather-head">
           <div class="weather-title-group">
             <h2>🌤️ Météo Pélio</h2>
+            <button type="button" class="nav-cond-badge" id="weather-nav-badge" aria-expanded="false" aria-controls="weather-nav-legend" hidden></button>
             <span class="weather-pill" id="weather-rain-pill">⏳ …</span>
             <span class="weather-pill is-wind-warn" id="weather-wind-pill" hidden></span>
           </div>
@@ -114,6 +115,15 @@
             <button type="button" class="weather-refresh-btn" id="btn-refresh-weather" aria-label="Actualiser la météo" title="Actualiser la météo">🔄</button>
           </div>
         </header>
+        <div class="weather-nav-legend" id="weather-nav-legend" hidden>
+          <span class="nav-leg-reason" id="weather-nav-reason"></span>
+          <div class="nav-leg-items">
+            <span><i class="w-nav-dot is-green" aria-hidden="true"></i> Ouest 8–25 km/h &amp; beau</span>
+            <span><i class="w-nav-dot is-blue" aria-hidden="true"></i> Sec / calme</span>
+            <span><i class="w-nav-dot is-amber" aria-hidden="true"></i> Pluie ou raf. 35+</span>
+            <span><i class="w-nav-dot is-red" aria-hidden="true"></i> Orage ou raf. 45+</span>
+          </div>
+        </div>
         <div class="weather-grid" id="weather-slots" role="list" aria-label="Prévisions météo toutes les 30 minutes sur 2 heures">
           <div class="weather-loading">Chargement météo…</div>
         </div>
@@ -1311,6 +1321,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js" defer></script>
-  <script src="./app.js?v=22" defer></script>
+  <script src="./app.js?v=23" defer></script>
 </body>
 </html>

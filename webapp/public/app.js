@@ -8,7 +8,7 @@ const STORAGE_MEMBER_KEY = 'tombola_member_id';
 const STORAGE_HELP_KEY = 'tombola_help_enabled';
 const STORAGE_TOUR_DONE = 'tombola_tour_done';
 const STORAGE_AUTO_GPS_KEY = 'tombola_auto_gps';
-const STORAGE_WEATHER_CACHE_KEY = 'tombola_weather_cache_v1';
+const STORAGE_WEATHER_CACHE_KEY = 'tombola_weather_cache_v2';
 const WEATHER_REFRESH_MS = 10 * 60 * 1000;
 const WEATHER_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 const BOAT_ICO = '<svg class="inline-boat-ico" viewBox="0 0 48 44" aria-hidden="true"><use href="#icon-loire-boat"></use></svg>';
@@ -1692,6 +1692,49 @@ function formatMmFr(mm) {
   return val.toFixed(1).replace('.', ',');
 }
 
+function isWestWindSector(deg) {
+  const norm = ((Number(deg || 0) % 360) + 360) % 360;
+  return norm >= 202.5 && norm <= 337.5;
+}
+
+function computeNavCondition(slot) {
+  const speed = Number(slot?.windSpeed || 0);
+  const gusts = Number(slot?.windGusts || 0);
+  const precip = Number(slot?.precip || 0);
+  const code = Number(slot?.weatherCode || 0);
+  const card = getWindCardinalFr(slot?.windDir);
+
+  if (code >= 95) {
+    return { level: 'red', label: 'Déconseillé', reason: 'Orage' };
+  }
+  if (precip >= 2.0 || [65, 67, 82, 86].includes(code)) {
+    return { level: 'red', label: 'Déconseillé', reason: 'Forte pluie' };
+  }
+  if (gusts >= 45 || speed >= 35) {
+    return { level: 'red', label: 'Déconseillé', reason: `Vent fort (raf. ${Math.round(gusts)} km/h)` };
+  }
+
+  if (precip >= 0.1 || isWetWeatherCode(code)) {
+    return { level: 'amber', label: 'Vigilance', reason: 'Averses / pluie' };
+  }
+  if (code === 45 || code === 48) {
+    return { level: 'amber', label: 'Vigilance', reason: 'Brouillard' };
+  }
+  if (gusts >= 35 || speed >= 25) {
+    return { level: 'amber', label: 'Vigilance', reason: `Rafales ${Math.round(gusts)} km/h` };
+  }
+
+  if (code <= 2 && isWestWindSector(slot?.windDir) && speed >= 8 && speed <= 25 && gusts < 35) {
+    return { level: 'green', label: 'Top voile', reason: `Vent ${card} ${Math.round(speed)} km/h • Beau temps` };
+  }
+
+  return {
+    level: 'blue',
+    label: 'Balade',
+    reason: speed < 8 ? 'Temps sec • Vent calme' : `Temps sec • Vent ${card} ${Math.round(speed)} km/h`
+  };
+}
+
 function parseOpenMeteoPayload(data) {
   const current = data?.current;
   const m15 = data?.minutely_15;
@@ -1786,6 +1829,19 @@ function parseOpenMeteoPayload(data) {
       : { kind: 'dry', text: `${Number(slots[0]?.isDay) !== 0 ? '☀️' : '🌙'} Sec (2h)` };
   }
 
+  for (const s of slots) {
+    s.nav = computeNavCondition(s);
+  }
+
+  const redSlot = slots.find((s) => s.nav.level === 'red');
+  const amberSlot = slots.find((s) => s.nav.level === 'amber');
+  const greenSlots = slots.filter((s) => s.nav.level === 'green');
+  const overallNav = redSlot?.nav
+    || amberSlot?.nav
+    || ((slots[0]?.nav.level === 'green' || greenSlots.length >= 2) ? greenSlots[0].nav : null)
+    || slots[0]?.nav
+    || { level: 'blue', label: 'Balade', reason: 'Temps sec' };
+
   const maxWind = Math.max(0, ...slots.map((s) => s.windSpeed));
   const maxGusts = Math.max(0, ...slots.map((s) => s.windGusts));
 
@@ -1794,6 +1850,7 @@ function parseOpenMeteoPayload(data) {
     updatedClock: formatClockHm(current.time),
     slots,
     rainSummary,
+    overallNav,
     maxWind,
     maxGusts
   };
@@ -1801,12 +1858,17 @@ function parseOpenMeteoPayload(data) {
 
 function renderWeatherCard(isOffline = false) {
   const slotsEl = $('#weather-slots');
+  const navBadge = $('#weather-nav-badge');
+  const navLegend = $('#weather-nav-legend');
+  const navReason = $('#weather-nav-reason');
   const rainPill = $('#weather-rain-pill');
   const windPill = $('#weather-wind-pill');
   const updatedEl = $('#weather-updated');
   if (!slotsEl || !rainPill || !windPill || !updatedEl) return;
 
   if (!weatherState || !Array.isArray(weatherState.slots) || weatherState.slots.length === 0) {
+    if (navBadge) navBadge.hidden = true;
+    if (navLegend) navLegend.hidden = true;
     rainPill.className = 'weather-pill';
     rainPill.textContent = isOffline ? '📡 Hors-ligne' : '⏳ …';
     windPill.hidden = true;
@@ -1818,6 +1880,26 @@ function renderWeatherCard(isOffline = false) {
   }
 
   const { slots, rainSummary, updatedClock, maxWind, maxGusts } = weatherState;
+  const computedSlots = slots.map((s) => ({ ...s, nav: s.nav || computeNavCondition(s) }));
+  const overallNav = weatherState.overallNav
+    || computedSlots.find((s) => s.nav.level === 'red')?.nav
+    || computedSlots.find((s) => s.nav.level === 'amber')?.nav
+    || ((computedSlots[0]?.nav.level === 'green' || computedSlots.filter((s) => s.nav.level === 'green').length >= 2)
+      ? computedSlots.find((s) => s.nav.level === 'green')?.nav
+      : null)
+    || computedSlots[0]?.nav
+    || { level: 'blue', label: 'Balade', reason: 'Temps sec' };
+
+  if (navBadge) {
+    navBadge.hidden = false;
+    navBadge.className = `nav-cond-badge is-${overallNav.level}`;
+    navBadge.title = `${overallNav.reason} (toucher pour la légende)`;
+    navBadge.innerHTML = `<span class="w-nav-dot is-${overallNav.level}" aria-hidden="true"></span>${BOAT_ICO}<span>${escapeHtml(overallNav.label)}</span>`;
+  }
+  if (navReason) {
+    navReason.textContent = `${overallNav.label} : ${overallNav.reason}`;
+  }
+
   rainPill.className = `weather-pill is-${rainSummary.kind}`;
   rainPill.textContent = rainSummary.text;
 
@@ -1835,7 +1917,7 @@ function renderWeatherCard(isOffline = false) {
 
   updatedEl.textContent = updatedClock ? `${updatedClock}${isOffline ? ' (hors-ligne)' : ''}` : '';
 
-  slotsEl.innerHTML = slots.map((s) => {
+  slotsEl.innerHTML = computedSlots.map((s) => {
     const speed = Math.round(s.windSpeed);
     const gusts = Math.round(s.windGusts);
     const hasGust = gusts > speed + 2;
@@ -1844,6 +1926,7 @@ function renderWeatherCard(isOffline = false) {
     const arrowDeg = (Math.round(s.windDir) + 180) % 360;
     const ico = getWeatherEmoji(s.weatherCode, s.isDay, s.precip);
     const windLevel = gusts >= 50 || speed >= 35 ? 'is-strong' : (gusts >= 35 || speed >= 25 ? 'is-mod' : '');
+    const nav = s.nav;
 
     const slotClasses = ['weather-slot'];
     if (s.isNow) slotClasses.push('is-now');
@@ -1854,13 +1937,16 @@ function renderWeatherCard(isOffline = false) {
     const rainTxt = s.precip >= 0.1
       ? `💧 ${formatMmFr(s.precip)} mm`
       : (isWet ? '💧 Pluie' : '—');
-    const aria = `${s.isNow ? 'Maintenant' : s.label}, ${Math.round(s.temp)} degrés, vent ${card} ${speed} km/h${
+    const aria = `${s.isNow ? 'Maintenant' : s.label}, ${nav.label}, ${Math.round(s.temp)} degrés, vent ${card} ${speed} km/h${
       hasGust ? `, rafales ${gusts} km/h` : ''
     }, ${isWet ? `pluie ${formatMmFr(s.precip)} mm` : 'pas de pluie'}`;
 
     return `
       <div class="${slotClasses.join(' ')}" role="listitem" aria-label="${escapeHtml(aria)}">
-        <span class="w-time">${escapeHtml(s.label)}</span>
+        <span class="w-time-row">
+          <span class="w-nav-dot is-${nav.level}" title="${escapeHtml(nav.label)} — ${escapeHtml(nav.reason)}" aria-hidden="true"></span>
+          <span class="w-time">${escapeHtml(s.label)}</span>
+        </span>
         <span class="w-ico" aria-hidden="true">${ico}</span>
         <span class="w-temp">${Math.round(s.temp)}°</span>
         <div class="w-wind">
@@ -3382,6 +3468,14 @@ function bindEvents() {
 
   $('#btn-refresh-weather')?.addEventListener('click', () => {
     loadWeather(true);
+  });
+
+  $('#weather-nav-badge')?.addEventListener('click', () => {
+    const legend = $('#weather-nav-legend');
+    const badge = $('#weather-nav-badge');
+    if (!legend || !badge) return;
+    legend.hidden = !legend.hidden;
+    badge.setAttribute('aria-expanded', String(!legend.hidden));
   });
 
   // Écopage
