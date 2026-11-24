@@ -1,9 +1,9 @@
-const CACHE_NAME = 'tombola-shell-v23';
+const CACHE_NAME = 'tombola-shell-v24';
 const SHELL_FILES = [
   './',
   './index.html',
-  './styles.css?v=23',
-  './app.js?v=23',
+  './styles.css?v=24',
+  './app.js?v=24',
   './manifest.json',
   './icon.svg'
 ];
